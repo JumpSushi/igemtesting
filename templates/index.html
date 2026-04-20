@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>decoder thing</title>
+<link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
+<style>
+* { border-radius: 0 !important; font-family: 'Red Hat Display', sans-serif !important; }
+
+body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; background: #fafafa; }
+
+nav { flex-shrink: 0; }
+
+.app-shell { flex: 1; display: grid; grid-template-columns: 240px 1fr; overflow: hidden; }
+
+.sidebar {
+  background: #fff;
+  border-right: 1px solid #e0e0e0;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+}
+
+.upload-zone {
+  border: 2px dashed #bdbdbd;
+  padding: 20px 8px;
+  text-align: center;
+  cursor: pointer;
+  color: #9e9e9e;
+  font-size: 13px;
+  line-height: 2;
+  transition: border-color .15s, color .15s;
+}
+.upload-zone input[type=file] { display: none; }
+.upload-zone:hover, .upload-zone.drag-over { border-color: #212121; color: #212121; }
+.upload-zone.has-file { border-color: #424242; color: #212121; }
+.upload-zone i { font-size: 32px !important; display: block; }
+
+.sidebar .btn, .sidebar .btn-flat { width: 100%; display: block; margin: 0; }
+
+.gen-params { display: none; background: #f5f5f5; border: 1px solid #e0e0e0; padding: 10px; margin-top: -4px; }
+.gen-params.open { display: block; }
+.gen-params label { font-size: 11px; color: #757575; display: block; margin-bottom: 2px; margin-top: 8px; }
+.gen-params label:first-child { margin-top: 0; }
+.gen-params input { width: 100%; border: 1px solid #e0e0e0; background: #fff; padding: 4px 6px; font-size: 13px; outline: none; }
+.gen-params input:focus { border-color: #212121; }
+.btn { background-color: #212121 !important; }
+.btn:hover, .btn:focus { background-color: #424242 !important; }
+
+.main-area { overflow-y: auto; padding: 16px; }
+
+.placeholder-card { height: 300px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: #bdbdbd; }
+.placeholder-card i { font-size: 52px !important; }
+
+.stats-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.stats-row .card { flex: 1; min-width: 100px; margin: 0; }
+.stats-row .card-content { padding: 12px 16px !important; }
+.stat-label { font-size: 10px; color: #9e9e9e; text-transform: uppercase; letter-spacing: .06em; }
+.stat-value { font-size: 26px; font-weight: 600; color: #212121; line-height: 1.1; }
+
+.section-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: #9e9e9e; margin-bottom: 8px; }
+
+.zoomable { display: inline-block; cursor: zoom-in; overflow: hidden; max-width: 100%; }
+.zoomable img { display: block; max-width: 100%; }
+
+.channel-cards { display: flex; gap: 8px; flex-wrap: wrap; }
+.channel-card { cursor: zoom-in; overflow: hidden; }
+.channel-card .card-image img { width: 110px; height: 110px; object-fit: cover; display: block; }
+.channel-card .card-content { padding: 5px 8px !important; text-align: center; }
+.channel-label { font-size: 11px; font-weight: 600; color: #424242; }
+
+table.results-table thead th { cursor: pointer; user-select: none; white-space: nowrap; font-weight: 600; color: #757575; }
+table.results-table thead th:hover { color: #212121; }
+.code-cell { font-family: ui-monospace, monospace !important; letter-spacing: .06em; }
+.chip-sirna   { background: #eeeeee !important; color: #212121 !important; }
+.chip-unknown { background: #e0e0e0 !important; color: #9e9e9e !important; }
+
+#status-bar { flex-shrink: 0; padding: 5px 20px; font-size: 11px; color: #9e9e9e; background: #fff; border-top: 1px solid #e0e0e0; }
+#status-bar.error { color: #c62828; }
+#status-bar.running { color: #616161; }
+#status-bar.ok { color: #2e7d32; }
+
+#lightbox { display: none; position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,.88); justify-content: center; align-items: center; cursor: zoom-out; }
+#lightbox.open { display: flex; }
+#lightbox .lb-wrap { position: relative; overflow: hidden; cursor: grab; touch-action: none; max-width: 92vw; max-height: 90vh; }
+#lightbox .lb-wrap.grabbing { cursor: grabbing; }
+#lightbox img { display: block; max-width: 92vw; max-height: 90vh; transform-origin: 0 0; pointer-events: none; user-select: none; }
+#lightbox .lb-hint { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.5); color: #eee; font-size: 11px; padding: 3px 12px; white-space: nowrap; pointer-events: none; }
+#lightbox .lb-close { position: fixed; top: 16px; right: 20px; color: #fff; background: rgba(0,0,0,.5); border: none; padding: 5px 12px; cursor: pointer; z-index: 10; }
+#lightbox .lb-label { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); color: #eee; font-size: 12px; font-weight: 600; background: rgba(0,0,0,.5); padding: 5px 16px; pointer-events: none; }
+</style>
+</head>
+<body>
+
+<nav class="black">
+  <div class="nav-wrapper" style="padding: 0 16px">
+    <span class="brand-logo" style="font-size:15px;font-weight:600">decoder thing</span>
+</nav>
+
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="upload-zone" id="dropZone">
+      <input type="file" id="fileInput" accept=".tif,.tiff">
+      <i class="material-icons">cloud_upload</i>
+      <strong id="dropLabel">Click or drag a TIFF here</strong>
+    </div>
+    <a class="waves-effect btn-flat grey lighten-2" id="btnGenerate">Generate test image ▾</a>
+    <div class="gen-params" id="genParams">
+      <label>Beads</label>
+      <input type="number" id="genBeads" value="150" min="1" max="2000">
+      <label>Noise level</label>
+      <input type="number" id="genNoise" value="0.03" min="0" max="1" step="0.01">
+      <label>Seed</label>
+      <input type="number" id="genSeed" value="42">
+      <a class="waves-effect waves-light btn" id="btnGenerateRun" style="margin-top:10px">Generate</a>
+    </div>
+    <a class="waves-effect waves-light btn" id="btnRun">Run pipeline</a>
+  </aside>
+
+  <div class="main-area" id="main">
+    <div class="card placeholder-card">
+      <i class="material-icons grey-text">scatter_plot</i>
+      <span class="grey-text">Load an image and press <strong>Run pipeline</strong></span>
+    </div>
+  </div>
+</div>
+
+<div id="status-bar">Ready</div>
+
+<div id="lightbox">
+  <button class="lb-close" id="lbClose">&#x2715; close</button>
+  <div class="lb-wrap" id="lbWrap">
+    <img id="lbImg" src="" alt="">
+    <div class="lb-label" id="lbLabel"></div>
+    <div class="lb-hint">Scroll to zoom · Drag to pan · Double-click to reset</div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+<script>
+let sessionFile = null, tableData = [], sortCol = null, sortAsc = true;
+
+setRunDisabled(true);
+
+const dropZone  = document.getElementById("dropZone");
+const fileInput = document.getElementById("fileInput");
+
+dropZone.addEventListener("click",     () => fileInput.click());
+dropZone.addEventListener("dragover",  e => { e.preventDefault(); dropZone.classList.add("drag-over"); });
+dropZone.addEventListener("dragleave", () => dropZone.classList.remove("drag-over"));
+dropZone.addEventListener("drop", e => {
+  e.preventDefault(); dropZone.classList.remove("drag-over");
+  if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener("change", () => { if (fileInput.files[0]) setFile(fileInput.files[0]); });
+
+function setFile(f) {
+  sessionFile = null;
+  dropZone.classList.add("has-file");
+  document.getElementById("dropLabel").textContent = f.name;
+  setRunDisabled(false);
+  setStatus("File selected: " + f.name);
+}
+
+document.getElementById("btnGenerate").addEventListener("click", () => {
+  document.getElementById("genParams").classList.toggle("open");
+});
+
+document.getElementById("btnGenerateRun").addEventListener("click", async () => {
+  const n_beads = parseInt(document.getElementById("genBeads").value) || 150;
+  const noise   = parseFloat(document.getElementById("genNoise").value) ?? 0.03;
+  const seed    = parseInt(document.getElementById("genSeed").value) ?? 42;
+  setBusy(true, "Generating...");
+  try {
+    const res  = await fetch("/api/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ n_beads, noise, seed }) });
+    const data = await res.json();
+    if (data.error) { setStatus(data.error, "error"); return; }
+    sessionFile = data.session_file;
+    dropZone.classList.add("has-file");
+    document.getElementById("dropLabel").textContent = `test_image.tif (${n_beads} beads, noise ${noise}, seed ${seed})`;
+    setRunDisabled(false);
+    document.getElementById("genParams").classList.remove("open");
+    renderResults(data);
+  } catch (err) { setStatus("Error: " + err.message, "error"); }
+  finally { setBusy(false); }
+});
+
+document.getElementById("btnRun").addEventListener("click", runPipeline);
+
+async function runPipeline() {
+  setBusy(true, "Running pipeline...");
+  const fd = new FormData();
+  if (fileInput.files[0]) fd.append("image", fileInput.files[0]);
+  else if (sessionFile)   fd.append("session_file", sessionFile);
+  else { setStatus("No image loaded.", "error"); setBusy(false); return; }
+  try {
+    const res  = await fetch("/api/run", { method: "POST", body: fd });
+    const data = await res.json();
+    if (data.error) { setStatus(data.error, "error"); return; }
+    if (data.session_file) sessionFile = data.session_file;
+    renderResults(data);
+  } catch (err) { setStatus("Network error: " + err.message, "error"); }
+  finally { setBusy(false); }
+}
+
+function renderResults(data) {
+  tableData = data.beads; sortCol = null;
+  const nUnk = data.beads.filter(b => b.siRNA === "UNKNOWN").length;
+
+  document.getElementById("main").innerHTML = `
+    <div class="stats-row">
+      <div class="card z-depth-1"><div class="card-content"><div class="stat-label">Beads detected</div><div class="stat-value">${data.n_beads}</div></div></div>
+      <div class="card z-depth-1"><div class="card-content"><div class="stat-label">Unique codes</div><div class="stat-value">${data.n_codes}</div></div></div>
+      <div class="card z-depth-1"><div class="card-content"><div class="stat-label">Unknown</div><div class="stat-value">${nUnk}</div></div></div>
+      <div class="card z-depth-1" style="display:flex;align-items:center;padding:0 14px">
+        <a class="waves-effect btn-flat" id="btnCsv">Export CSV</a>
+      </div>
+    </div>
+
+    <div class="card z-depth-1" style="margin-bottom:12px">
+      <div class="card-content">
+        <p class="section-label">Annotated image</p>
+        <div class="zoomable" data-src="data:image/png;base64,${data.image}" data-label="Annotated">
+          <img src="data:image/png;base64,${data.image}" alt="">
+        </div>
+      </div>
+    </div>
+
+    ${channelStripHtml(data)}
+
+    <div class="card z-depth-1" style="margin-bottom:12px">
+      <div class="card-content">
+        <p class="section-label">Bead results</p>
+        <div style="overflow-x:auto">
+          <table class="results-table striped highlight responsive-table">
+            <thead id="tableHead"></thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>`;
+
+  document.getElementById("btnCsv").addEventListener("click", exportCsv);
+  document.querySelectorAll(".zoomable").forEach(el =>
+    el.addEventListener("click", () => openLightbox(el.dataset.src, el.dataset.label || ""))
+  );
+  document.querySelectorAll(".channel-card").forEach(el =>
+    el.addEventListener("click", () => openLightbox(el.querySelector("img").src, el.querySelector(".channel-label").textContent))
+  );
+  renderTable();
+  setStatus(`Done — ${data.n_beads} beads, ${data.n_codes} unique codes, ${nUnk} unknown.`, "ok");
+}
+
+function channelStripHtml(data) {
+  if (!data.channels_b64?.length) return "";
+  const cards = data.channels_b64.map((b64, i) => {
+    const label = data.ch_labels?.[i] ?? `Ch${i + 1}`;
+    return `<div class="card channel-card z-depth-1">
+      <div class="card-image"><img src="data:image/png;base64,${b64}" alt="${label}"></div>
+      <div class="card-content"><span class="channel-label">${label}</span></div>
+    </div>`;
+  }).join("");
+  return `<div class="card z-depth-1" style="margin-bottom:12px">
+    <div class="card-content">
+      <p class="section-label">Individual channels</p>
+      <div class="channel-cards">${cards}</div>
+    </div>
+  </div>`;
+}
+
+function renderTable() {
+  if (!tableData.length) return;
+  const cols = Object.keys(tableData[0]);
+  document.getElementById("tableHead").innerHTML =
+    "<tr>" + cols.map(c => `<th data-col="${c}">${c}${sortCol===c?(sortAsc?" ↑":" ↓"):""}</th>`).join("") + "</tr>";
+  document.querySelectorAll("#tableHead th").forEach(th =>
+    th.addEventListener("click", () => {
+      sortCol === th.dataset.col ? (sortAsc = !sortAsc) : (sortCol = th.dataset.col, sortAsc = true);
+      renderTable();
+    })
+  );
+  const rows = [...tableData];
+  if (sortCol) rows.sort((a,b) => { const n=v=>isNaN(+v)?v:+v, av=n(a[sortCol]), bv=n(b[sortCol]); return av<bv?(sortAsc?-1:1):av>bv?(sortAsc?1:-1):0; });
+  document.getElementById("tableBody").innerHTML = rows.map(row =>
+    "<tr>" + cols.map(col => {
+      const val = row[col] ?? "";
+      if (col === "code") return `<td class="code-cell">${val}</td>`;
+      if (col === "siRNA") return `<td><span class="chip ${val==="UNKNOWN"?"chip-unknown":"chip-sirna"}">${val}</span></td>`;
+      if (typeof val === "number") return `<td>${val.toFixed(["QD547","QD572","QD604","QD641","AF647"].includes(col)?4:1)}</td>`;
+      return `<td>${val}</td>`;
+    }).join("") + "</tr>"
+  ).join("");
+}
+
+function exportCsv() {
+  if (!tableData.length) return;
+  const cols = Object.keys(tableData[0]);
+  const lines = [cols.join(","), ...tableData.map(r => cols.map(c => JSON.stringify(r[c]??``)).join(","))];
+  Object.assign(document.createElement("a"), { href: URL.createObjectURL(new Blob([lines.join("\n")], {type:"text/csv"})), download: "bead_results.csv" }).click();
+}
+
+const lb=document.getElementById("lightbox"), lbWrap=document.getElementById("lbWrap"), lbImg=document.getElementById("lbImg"), lbLabel=document.getElementById("lbLabel");
+let lbScale=1, lbOx=0, lbOy=0, dragging=false, dragStart={x:0,y:0};
+
+function openLightbox(src, label) { lbImg.src=src; lbLabel.textContent=label; lbScale=1; lbOx=0; lbOy=0; applyTransform(); lb.classList.add("open"); }
+function closeLightbox() { lb.classList.remove("open"); lbImg.src=""; }
+function applyTransform() { lbImg.style.transform=`translate(${lbOx}px,${lbOy}px) scale(${lbScale})`; }
+
+document.getElementById("lbClose").addEventListener("click", e => { e.stopPropagation(); closeLightbox(); });
+lb.addEventListener("click", e => { if (e.target===lb) closeLightbox(); });
+document.addEventListener("keydown", e => { if (e.key==="Escape") closeLightbox(); });
+lbWrap.addEventListener("wheel", e => {
+  e.preventDefault();
+  const r=lbWrap.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
+  const f=e.deltaY<0?1.12:1/1.12, ns=Math.min(16,Math.max(0.4,lbScale*f));
+  lbOx=mx-(mx-lbOx)*(ns/lbScale); lbOy=my-(my-lbOy)*(ns/lbScale); lbScale=ns; applyTransform();
+}, {passive:false});
+lbWrap.addEventListener("pointerdown", e => { dragging=true; dragStart={x:e.clientX-lbOx,y:e.clientY-lbOy}; lbWrap.classList.add("grabbing"); lbWrap.setPointerCapture(e.pointerId); });
+lbWrap.addEventListener("pointermove", e => { if (!dragging) return; lbOx=e.clientX-dragStart.x; lbOy=e.clientY-dragStart.y; applyTransform(); });
+lbWrap.addEventListener("pointerup",     () => { dragging=false; lbWrap.classList.remove("grabbing"); });
+lbWrap.addEventListener("pointercancel", () => { dragging=false; lbWrap.classList.remove("grabbing"); });
+lbWrap.addEventListener("dblclick",      () => { lbScale=1; lbOx=0; lbOy=0; applyTransform(); });
+
+function setRunDisabled(d) { const b=document.getElementById("btnRun"); b.classList.toggle("disabled",d); b.style.pointerEvents=d?"none":""; b.style.opacity=d?".38":""; }
+function setBusy(busy, msg="") {
+  setRunDisabled(busy || !(fileInput.files[0]||sessionFile));
+  const g=document.getElementById("btnGenerate"); g.classList.toggle("disabled",busy); g.style.pointerEvents=busy?"none":""; g.style.opacity=busy?".38":"";
+  if (msg) setStatus(msg,"running");
+}
+function setStatus(msg, type="") { const el=document.getElementById("status-bar"); el.textContent=msg; el.className=type; }
+</script>
+</body>
+</html>
