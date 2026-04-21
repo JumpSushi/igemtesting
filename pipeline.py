@@ -14,7 +14,7 @@ from skimage.feature import blob_log
 from skimage.filters import threshold_otsu
 from skimage.draw import disk as draw_disk
 
-# 21 knock-bead codes (TODO: get actual gene names from paper)
+# 21 knock-bead codes (TODO: get actual gene names from paper, i'm lazy will do someday)
 DEFAULT_SIRNA_MAP: dict[str, str] = {
     # single
     "10000": "siRNA-A",
@@ -218,6 +218,138 @@ def binary_to_code(binary: np.ndarray) -> list[str]:
 
 def lookup_sirna(codes: list[str], sirna_map: dict[str, str]) -> list[str]:
     return [sirna_map.get(code, "UNKNOWN") for code in codes]
+
+
+# compare detected beads to truth data
+
+def load_truth_csv(csv_path: Path) -> pd.DataFrame:
+    # load truth data with expected columns: bead_id, row_px, col_px, code, siRNA
+    df = pd.read_csv(csv_path)
+    required = {"row_px", "col_px", "code", "siRNA"}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"Truth CSV missing columns: {missing}")
+    return df
+
+
+def match_beads_to_truth(
+    detected_blobs: np.ndarray,
+    detected_codes: list[str],
+    detected_identities: list[str],
+    truth_df: pd.DataFrame,
+    max_distance: float = 10.0,
+) -> dict:
+    """
+    Match detected beads to truth beads by spatial proximity.
+    Returns detailed comparison metrics and per-bead match information.
+    """
+    n_detected = len(detected_blobs)
+    n_truth = len(truth_df)
+    
+    # Initialize results
+    matches = []
+    matched_truth_indices = set()
+    
+    # For each detected bead, find closest truth bead
+    for det_idx, (blob, det_code, det_identity) in enumerate(
+        zip(detected_blobs, detected_codes, detected_identities)
+    ):
+        det_row, det_col = blob[0], blob[1]
+        
+        # Compute distance to all truth beads
+        truth_rows = truth_df["row_px"].values
+        truth_cols = truth_df["col_px"].values
+        distances = np.sqrt((truth_rows - det_row)**2 + (truth_cols - det_col)**2)
+        
+        min_dist_idx = np.argmin(distances)
+        min_dist = distances[min_dist_idx]
+        
+        # Check if match is within threshold and not already matched
+        is_matched = min_dist <= max_distance and min_dist_idx not in matched_truth_indices
+        
+        if is_matched:
+            matched_truth_indices.add(min_dist_idx)
+            truth_row = truth_df.iloc[min_dist_idx]
+            truth_code = str(truth_row["code"])
+            truth_identity = str(truth_row["siRNA"])
+            
+            matches.append({
+                "detected_idx": det_idx,
+                "truth_idx": min_dist_idx,
+                "det_row": float(det_row),
+                "det_col": float(det_col),
+                "truth_row": float(truth_row["row_px"]),
+                "truth_col": float(truth_row["col_px"]),
+                "distance": float(min_dist),
+                "det_code": det_code,
+                "truth_code": truth_code,
+                "code_match": det_code == truth_code,
+                "det_identity": det_identity,
+                "truth_identity": truth_identity,
+                "identity_match": det_identity == truth_identity,
+                "status": "correct" if det_code == truth_code else "code_mismatch",
+            })
+        else:
+            # False positive (detected but no matching truth)
+            matches.append({
+                "detected_idx": det_idx,
+                "truth_idx": None,
+                "det_row": float(det_row),
+                "det_col": float(det_col),
+                "truth_row": None,
+                "truth_col": None,
+                "distance": float(min_dist) if n_truth > 0 else None,
+                "det_code": det_code,
+                "truth_code": None,
+                "code_match": False,
+                "det_identity": det_identity,
+                "truth_identity": None,
+                "identity_match": False,
+                "status": "false_positive",
+            })
+    
+    # Find unmatched truth beads (false negatives)
+    false_negatives = []
+    for truth_idx, (idx, truth_row) in enumerate(truth_df.iterrows()):
+        if truth_idx not in matched_truth_indices:
+            false_negatives.append({
+                "truth_idx": truth_idx,
+                "truth_row": float(truth_row["row_px"]),
+                "truth_col": float(truth_row["col_px"]),
+                "truth_code": str(truth_row["code"]),
+                "truth_identity": str(truth_row["siRNA"]),
+                "status": "false_negative",
+            })
+    
+    # Calculate metrics
+    true_positives = sum(1 for m in matches if m["status"] != "false_positive" and m["code_match"])
+    code_matches = sum(1 for m in matches if m["code_match"])
+    identity_matches = sum(1 for m in matches if m["identity_match"])
+    false_positives = sum(1 for m in matches if m["status"] == "false_positive")
+    false_negatives_count = len(false_negatives)
+    
+    # Avoid division by zero
+    precision = code_matches / n_detected if n_detected > 0 else 0.0
+    recall = code_matches / n_truth if n_truth > 0 else 0.0
+    f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
+    
+    return {
+        "matches": matches,
+        "false_negatives": false_negatives,
+        "metrics": {
+            "n_detected": int(n_detected),
+            "n_truth": int(n_truth),
+            "true_positives": int(true_positives),
+            "false_positives": int(false_positives),
+            "false_negatives": int(false_negatives_count),
+            "code_matches": int(code_matches),
+            "identity_matches": int(identity_matches),
+            "precision": float(precision),
+            "recall": float(recall),
+            "f1_score": float(f1),
+            "code_accuracy": float(code_matches / n_detected) if n_detected > 0 else 0.0,
+        }
+    }
 
 
 # load sirna map from csv
