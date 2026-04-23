@@ -307,7 +307,7 @@ def api_run():
         return jsonify({"error": traceback.format_exc()}), 500
 
 
-# main
+# praytothepythongodsandletitrun
 
 if __name__ == "__main__":
     import webbrowser
