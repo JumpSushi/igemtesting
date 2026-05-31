@@ -1,0 +1,5 @@
+target_position,target_sequence,guide_21nt,passenger_21nt,functional_selection,guide_seed_tm,passenger_seed_tm,guide_off_targets_0plus,guide_off_targets_1plus,guide_off_targets_2plus,guide_off_targets_3plus,pass_off_targets_0minus,pass_off_targets_1minus,pass_off_targets_2minus,pass_off_targets_3minus,target_pos_constraint,consec_gc,consec_at,gc_content
+908-930,ACGATAACCGGGAGATAGTGATG,UCACUAUCUCCCGGUUAUCGU GAUAACCGGGAGAUAGUGAUG,U,,20.3 °C,20.6 °C,3 [detail],3 [detail],1,0,0,2,0,0,0,6,ok,ok
+917-939,GGGAGATAGTGATGAAGTACATC,UGUACUUCAUCACUAUCUCCC GAGAUAGUGAUGAAGUACAUC,U,,21.4 °C,18.9 °C,2 [detail],2 [detail],1,0,1,27,0,0,2,23,ok,ok
+925-947,GTGATGAAGTACATCCATTATAA,AUAAUGGAUGUACUUCAUCAC GAUGAAGUACAUCCAUUAUAA,U,,21.2 °C,19.2 °C,2 [detail],2 [detail],1,0,2,23,0,0,2,42,ok,ok
+1317-1339,GAGGATTGTGGCCTTCTTTGAGT,UCAAAGAAGGCCACAAUCCUC GGAUUGUGGCCUUCUUUGAGU,U,,12.2 °C,20.5 °C,2 [detail],2 [detail],1,0,2,45,0,0,2,30,ok,ok

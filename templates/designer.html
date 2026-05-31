@@ -1,0 +1,1400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>siRNA Designer — igem26</title>
+<link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400;500;600&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
+<style>
+* { border-radius: 0 !important; font-family: 'Red Hat Display', sans-serif !important; }
+.material-icons { font-family: 'Material Icons' !important; font-weight: normal; font-style: normal; }
+/* Allow spinner circles */
+.custom-spinner { border-radius: 50% !important; }
+/* Kill all focus outlines */
+*:focus, *:focus-visible { outline: none !important; box-shadow: none !important; }
+
+body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; background: #fafafa; }
+nav { flex-shrink: 0; }
+[hidden] { display: none !important; }
+
+.btn { background-color: #212121 !important; }
+.btn:hover, .btn:focus { background-color: #424242 !important; }
+
+/* ── Status bar ───────────────────────────────── */
+#status-bar {
+  flex-shrink: 0; padding: 5px 20px; font-size: 11px; color: #9e9e9e;
+  background: #fff; border-top: 1px solid #e0e0e0;
+}
+#status-bar.error   { color: #c62828; }
+#status-bar.running { color: #616161; }
+#status-bar.ok      { color: #2e7d32; }
+
+/* ── Welcome view ─────────────────────────────── */
+#view-welcome {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 28px;
+}
+.welcome-heading {
+  font-size: 52px; font-weight: 600; color: #212121; letter-spacing: -.02em;
+}
+.gene-search-wrap { position: relative; width: 460px; }
+.gene-search-input {
+  width: 100%; box-sizing: border-box;
+  border: 2px solid #212121; padding: 13px 16px;
+  font-size: 16px; outline: none; background: #fff; color: #212121;
+  transition: border-color .15s;
+}
+.gene-search-input:focus { border-color: #000; }
+.ac-dropdown {
+  position: absolute; top: 100%; left: 0; right: 0; background: #fff;
+  border: 1px solid #e0e0e0; border-top: none; z-index: 200;
+  max-height: 260px; overflow-y: auto;
+  box-shadow: 0 6px 16px rgba(0,0,0,.10);
+}
+.ac-item {
+  padding: 9px 16px; font-size: 14px; cursor: pointer; color: #212121;
+  display: flex; justify-content: space-between; align-items: center;
+  border-bottom: 1px solid #f5f5f5;
+}
+.ac-item:last-child { border-bottom: none; }
+.ac-item:hover, .ac-item.kbd-active { background: #f5f5f5; }
+.ac-tag { font-size: 10px; color: #9e9e9e; background: #f0f0f0; padding: 1px 6px; }
+.welcome-actions { display: flex; gap: 14px; align-items: center; }
+.welcome-actions .btn {
+  padding: 0 36px; height: 46px; line-height: 46px;
+  font-size: 14px; letter-spacing: .02em;
+}
+.welcome-actions .btn-flat {
+  font-size: 13px; color: #616161; padding: 0 18px; height: 46px;
+  line-height: 46px; border: 1px solid #e0e0e0;
+}
+.welcome-actions .btn-flat:hover { background: #f5f5f5; color: #212121; }
+
+/* ── Isoform picker view ──────────────────────── */
+#view-isoforms { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.iso-scroll { flex: 1; overflow-y: auto; padding: 28px 48px; display: flex; flex-direction: column; gap: 20px; }
+
+.view-header { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+.view-header h2 { font-size: 20px; font-weight: 600; color: #212121; margin: 0; }
+.back-btn {
+  border: 1px solid #e0e0e0; background: #fff; padding: 5px 12px;
+  font-size: 12px; cursor: pointer; color: #616161;
+  display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+}
+.back-btn:hover { background: #f5f5f5; color: #212121; }
+
+.select-wrap { display: flex; flex-direction: column; gap: 4px; }
+.select-wrap label { font-size: 11px; color: #757575; text-transform: uppercase; letter-spacing: .06em; }
+.select-wrap select {
+  border: 1px solid #e0e0e0; padding: 7px 12px; font-size: 13px;
+  background: #fff; color: #212121; cursor: pointer; outline: none; min-width: 260px;
+}
+.select-wrap select:focus { border-color: #212121; }
+
+.isoform-list-box {
+  background: transparent;
+  display: flex; flex-direction: column;
+}
+.isoform-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 9px 4px; cursor: pointer;
+  border-bottom: 1px solid #f0f0f0; user-select: none;
+}
+.isoform-row:last-child { border-bottom: none; }
+.isoform-row:hover { background: #fafafa; }
+/* Force native checkbox visible over Materialize */
+.isoform-row input[type=checkbox] {
+  position: static !important; opacity: 1 !important; pointer-events: auto !important;
+  width: 14px !important; height: 14px !important; flex-shrink: 0;
+  margin-top: 3px; cursor: pointer; accent-color: #212121;
+}
+.isoform-acc { font-size: 13px; font-weight: 600; color: #212121; font-family: 'Roboto Mono', monospace !important; }
+.isoform-title { font-size: 12px; color: #757575; margin-top: 2px; line-height: 1.4; }
+.isoform-len { font-size: 10px; color: #bdbdbd; margin-top: 2px; }
+
+/* ── Shared-isoform table cell ──────────────────── */
+.iso-chips { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }
+.iso-chip {
+  display: inline-block; padding: 1px 6px; font-size: 10px; font-weight: 600;
+  font-family: 'Roboto Mono', monospace !important;
+}
+.iso-chip-all  { background: #eeeeee; color: #212121; }
+.iso-chip-some { background: #e0e0e0; color: #616161; }
+.expand-btn {
+  background: none; border: none; padding: 0 2px; cursor: pointer; color: #9e9e9e;
+  font-size: 13px !important; vertical-align: middle;
+  transition: transform .2s ease, color .15s;
+}
+.expand-btn:hover { color: #212121; }
+.expand-btn.open { transform: rotate(90deg); }
+.detail-row td {
+  background: #fafafa; border-bottom: 2px solid #e0e0e0 !important;
+  padding: 0 !important;
+}
+.detail-inner {
+  max-height: 0; overflow: hidden;
+  transition: max-height .28s cubic-bezier(.4,0,.2,1);
+}
+.detail-inner.open { max-height: 400px; }
+.detail-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.detail-table td, .detail-table th {
+  padding: 5px 14px; border-bottom: 1px solid #f0f0f0; white-space: nowrap;
+}
+.detail-table th { color: #9e9e9e; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; font-size: 10px; }
+
+.select-all-lnk { font-size: 12px; color: #616161; cursor: pointer; text-decoration: underline; }
+.select-all-lnk:hover { color: #212121; }
+
+/* ── Running view ─────────────────────────────── */
+#view-running {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; overflow-y: auto; padding: 40px 20px; gap: 20px;
+}
+.running-inner { width: 100%; max-width: 640px; display: flex; flex-direction: column; gap: 18px; }
+.running-title { font-size: 20px; font-weight: 600; color: #212121; }
+.progress-log {
+  border: 1px solid #e0e0e0; background: #fff;
+  max-height: 400px; overflow-y: auto;
+}
+.log-entry {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 8px 14px; font-size: 12px; color: #424242;
+  border-bottom: 1px solid #f5f5f5; line-height: 1.5;
+}
+.log-entry:last-child { border-bottom: none; }
+.log-entry .log-icon { font-size: 16px !important; flex-shrink: 0; margin-top: 1px; }
+.log-done  .log-icon { color: #2e7d32; }
+.log-warn  .log-icon { color: #f57f17; }
+.log-error .log-icon { color: #c62828; }
+.log-run   .log-icon { color: #616161; }
+.log-info  .log-icon { color: #bdbdbd; }
+.spinner-wrap { display: flex; justify-content: center; }
+/* Simple CSS spinner */
+.custom-spinner {
+  width: 28px; height: 28px;
+  border: 3px solid #e0e0e0;
+  border-top-color: #212121;
+  animation: spin .75s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Filter panel (slide-in drawer) ──────────── */
+#panel-filter {
+  position: fixed; top: 56px; right: 0; bottom: 24px; width: 280px;
+  background: #fff; border-left: 1px solid #e0e0e0;
+  display: flex; flex-direction: column; z-index: 600;
+  box-shadow: -4px 0 20px rgba(0,0,0,.10);
+  transform: translateX(100%);
+  transition: transform .22s cubic-bezier(.4,0,.2,1);
+}
+#panel-filter.open { transform: translateX(0); }
+.fpanel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; border-bottom: 1px solid #e0e0e0; flex-shrink: 0;
+}
+.fpanel-header span { font-size: 13px; font-weight: 600; color: #212121; }
+.fpanel-close { background: none; border: none; cursor: pointer; color: #9e9e9e; font-size: 22px; padding: 0; line-height: 1; }
+.fpanel-close:hover { color: #212121; }
+.fpanel-body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 20px; }
+.fpanel-section { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: #9e9e9e; margin-bottom: 10px; }
+.fpanel-row {
+  display: flex; align-items: center; gap: 10px; cursor: pointer;
+  padding: 9px 0; border-bottom: 1px solid #f5f5f5; user-select: none;
+}
+.fpanel-row:last-child { border-bottom: none; }
+.fpanel-row span { font-size: 13px; color: #212121; }
+.fpanel-row input[type=checkbox] { display: none; }
+.fcb {
+  width: 18px; height: 18px; flex-shrink: 0;
+  border: 2px solid #bdbdbd;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color .15s, background .15s;
+}
+.fpanel-row:has(input:checked) .fcb { border-color: #212121; background: #212121; }
+.fcb i { color: #fff; font-size: 12px !important; opacity: 0; transition: opacity .12s; }
+.fpanel-row:has(input:checked) .fcb i { opacity: 1; }
+.fpanel-select {
+  width: 100%; border: 1px solid #e0e0e0; padding: 7px 10px;
+  font-size: 13px; background: #fff; color: #212121; cursor: pointer;
+}
+.fpanel-select:focus { border-color: #212121; }
+/* Filter trigger row */
+.filter-trigger-row { display: flex; align-items: center; gap: 10px; }
+.filter-trigger-btn {
+  display: flex; align-items: center; gap: 5px;
+  border: 1px solid #e0e0e0; background: #fff; padding: 5px 12px;
+  font-size: 12px; cursor: pointer; color: #424242;
+  transition: background .1s, color .1s, border-color .1s; white-space: nowrap;
+}
+.filter-trigger-btn:hover { background: #f5f5f5; }
+.filter-trigger-btn i { font-size: 14px !important; }
+.filter-trigger-btn.has-active { border-color: #212121; background: #212121; color: #fff; }
+.filter-summary-text { font-size: 11px; color: #9e9e9e; }
+
+/* ── Results view — app shell ─────────────────── */
+.app-shell { flex: 1; display: grid; grid-template-columns: 230px 1fr; overflow: hidden; }
+
+.sidebar {
+  background: #fff; border-right: 1px solid #e0e0e0; padding: 12px;
+  display: flex; flex-direction: column; gap: 6px; overflow-y: auto;
+}
+.sidebar .section-label {
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .08em; color: #9e9e9e; margin-bottom: 2px; margin-top: 8px;
+}
+.sidebar .section-label:first-child { margin-top: 0; }
+.sidebar .btn, .sidebar .btn-flat { width: 100%; display: block; margin: 0; font-size: 12px; height: 36px; line-height: 36px; }
+.filter-btn {
+  display: block; width: 100%; text-align: left; padding: 5px 10px; font-size: 12px;
+  border: 1px solid #e0e0e0; background: #fff; color: #757575; cursor: pointer; transition: background .1s;
+}
+.filter-btn:hover { background: #f5f5f5; color: #212121; }
+.filter-btn.active { background: #424242; color: #fff; border-color: #424242; }
+.acc-btn {
+  display: block; width: 100%; text-align: left; padding: 4px 10px; font-size: 11px;
+  border: 1px solid #e0e0e0; background: #fff; color: #757575; cursor: pointer;
+  transition: background .1s; margin-bottom: 2px;
+  font-family: 'Roboto Mono', monospace !important;
+}
+.acc-btn:hover { background: #f5f5f5; color: #212121; }
+.acc-btn.active { background: #212121; color: #fff; border-color: #212121; }
+.seq-search {
+  width: 100%; border: 1px solid #e0e0e0; padding: 5px 8px; font-size: 12px; outline: none;
+}
+.seq-search:focus { border-color: #212121; }
+
+.main-area { overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.placeholder-card {
+  height: 300px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 10px; color: #bdbdbd;
+}
+.placeholder-card i { font-size: 52px !important; }
+.stats-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.stats-row .card { flex: 1; min-width: 100px; margin: 0; }
+.stats-row .card-content { padding: 12px 16px !important; }
+.stat-label { font-size: 10px; color: #9e9e9e; text-transform: uppercase; letter-spacing: .06em; }
+.stat-value { font-size: 26px; font-weight: 600; color: #212121; line-height: 1.1; }
+.section-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: #9e9e9e; margin-bottom: 8px; }
+
+table.results-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.results-table thead th {
+  cursor: pointer; user-select: none; white-space: nowrap; font-weight: 600;
+  color: #757575; padding: 8px 10px; border-bottom: 2px solid #e0e0e0; text-align: left;
+}
+table.results-table thead th:hover { color: #212121; }
+table.results-table tbody tr { border-bottom: 1px solid #f0f0f0; transition: background .08s; }
+table.results-table tbody tr:hover { background: #f5f5f5; }
+table.results-table tbody td { padding: 7px 10px; vertical-align: middle; white-space: nowrap; }
+
+.seq-cell { font-family: 'Roboto Mono', monospace !important; letter-spacing: .02em; font-size: 12px; color: #212121; }
+.score-pill { display: inline-block; padding: 1px 8px; font-size: 11px; font-weight: 700; color: #fff; }
+.tick  { color: #2e7d32; font-weight: 700; }
+.cross { color: #bdbdbd; }
+.gc-wrap { display: inline-flex; align-items: center; gap: 6px; }
+.gc-bar  { height: 5px; background: #212121; opacity: 0.35; min-width: 2px; }
+.acc-badge { display: inline-block; padding: 1px 7px; font-size: 10px; font-weight: 600; background: #eeeeee; color: #424242; font-family: 'Roboto Mono', monospace !important; }
+.region-badge {
+  display: inline-block; padding: 1px 6px; font-size: 10px; font-weight: 600;
+  background: #eeeeee; color: #424242;
+}
+
+.pagination-row {
+  display: flex; justify-content: flex-end; align-items: center; gap: 10px;
+  padding: 8px 12px; border-top: 1px solid #e0e0e0; font-size: 12px; color: #9e9e9e;
+}
+.pagination-row button { border: 1px solid #e0e0e0; background: #fff; padding: 3px 10px; font-size: 12px; cursor: pointer; }
+.pagination-row button:hover:not(:disabled) { background: #f5f5f5; border-color: #424242; }
+.pagination-row button:disabled { opacity: .35; cursor: default; }
+
+/* ── Saved panel ──────────────────────────────── */
+#panel-saved {
+  position: fixed; top: 56px; right: 0; bottom: 24px; width: 390px;
+  background: #fff; border-left: 1px solid #e0e0e0;
+  display: flex; flex-direction: column; z-index: 500;
+  box-shadow: -4px 0 20px rgba(0,0,0,.1);
+  transform: translateX(100%);
+  transition: transform .22s cubic-bezier(.4,0,.2,1);
+}
+#panel-saved.open { transform: translateX(0); }
+.saved-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; border-bottom: 1px solid #e0e0e0; flex-shrink: 0;
+}
+.saved-header h3 { font-size: 14px; font-weight: 600; color: #212121; margin: 0; }
+.saved-close { background: none; border: none; cursor: pointer; color: #9e9e9e; font-size: 22px; padding: 0; line-height: 1; }
+.saved-close:hover { color: #212121; }
+.saved-list { flex: 1; overflow-y: auto; }
+.saved-item {
+  display: flex; align-items: flex-start; gap: 0; padding: 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+.saved-item-main {
+  flex: 1; padding: 12px 16px; cursor: pointer; transition: background .1s;
+}
+.saved-item-main:hover { background: #fafafa; }
+.saved-item-gene { font-size: 14px; font-weight: 600; color: #212121; }
+.saved-item-name { font-size: 10px; color: #bdbdbd; font-family: 'Roboto Mono', monospace !important; margin-top: 1px; }
+.saved-item-meta { font-size: 11px; color: #9e9e9e; display: flex; gap: 12px; flex-wrap: wrap; }
+.saved-item-accs { font-size: 10px; color: #bdbdbd; font-family: 'Roboto Mono', monospace !important; }
+.saved-empty { padding: 40px 24px; text-align: center; color: #bdbdbd; font-size: 13px; line-height: 1.8; }
+.saved-del-btn {
+  flex-shrink: 0; width: 40px; display: flex; align-items: center; justify-content: center;
+  border: none; background: none; cursor: pointer; color: #e0e0e0;
+  transition: color .15s; font-size: 16px; align-self: stretch;
+}
+.saved-del-btn:hover { color: #c62828; background: #fff5f5; }
+/* ── Save-name modal ─────────────────────────────── */
+#modal-save-name {
+  position: fixed; inset: 0; background: rgba(0,0,0,.35);
+  display: flex; align-items: center; justify-content: center; z-index: 900;
+}
+.save-modal-box {
+  background: #fff; padding: 28px 24px; width: 360px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.18);
+  display: flex; flex-direction: column; gap: 14px;
+}
+.save-modal-box h3 { font-size: 15px; font-weight: 600; color: #212121; margin: 0; }
+.save-modal-box input {
+  width: 100%; box-sizing: border-box;
+  border: 1px solid #e0e0e0; padding: 9px 10px; font-size: 13px; outline: none;
+}
+.save-modal-box input:focus { border-color: #212121; }
+.save-modal-preview { font-size: 11px; color: #9e9e9e; }
+.save-modal-preview strong { color: #424242; font-family: 'Roboto Mono', monospace; }
+.save-modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+</style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav class="black">
+  <div class="nav-wrapper" style="padding:0 16px;display:flex;align-items:center;justify-content:space-between;">
+    <span class="brand-logo" style="font-size:15px;position:static;"><span style="font-weight:400;">iGEM</span> <span style="font-weight:700;">badly coded designer</span></span>
+    <div style="display:flex;align-items:center;gap:18px;">
+      <button onclick="toggleSaved()" style="background:none;border:none;cursor:pointer;color:#9e9e9e;font-size:12px;font-family:inherit;display:flex;align-items:center;gap:4px;padding:0;">
+        <i class="material-icons" style="font-size:15px;vertical-align:middle">folder_open</i> Already scraped
+      </button>
+    </div>
+  </div>
+</nav>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     View 1 — Welcome
+════════════════════════════════════════════════════════════════════════════ -->
+<div id="view-welcome">
+  <div class="welcome-heading">Welcome.</div>
+
+  <div class="gene-search-wrap">
+    <input id="geneInput" class="gene-search-input" type="text"
+           placeholder="Enter gene name…" autocomplete="off" spellcheck="false">
+    <div id="acDrop" class="ac-dropdown" hidden></div>
+  </div>
+
+  <div class="welcome-actions">
+    <button id="btnDesign" class="btn waves-effect waves-light" onclick="startSearch()">
+      Design siRNA →
+    </button>
+    <button class="btn-flat waves-effect" onclick="toggleSaved()">
+      <i class="material-icons" style="vertical-align:middle;font-size:15px;margin-right:4px">folder_open</i>
+      Saved
+    </button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     View 2 — Isoform Picker
+════════════════════════════════════════════════════════════════════════════ -->
+<div id="view-isoforms" hidden>
+  <div class="iso-scroll">
+
+    <div class="view-header">
+      <button class="back-btn" onclick="showView('welcome')">
+        <i class="material-icons" style="font-size:15px">arrow_back</i> Back
+      </button>
+      <h2 id="isoHeading">Select isoforms</h2>
+    </div>
+
+    <div>
+      <div class="select-wrap" style="max-width:320px;">
+        <label>Species / siDirect2 database</label>
+        <select id="speciesSelect">
+          <option value="hs_refseq230">Homo sapiens — RefSeq 230</option>
+          <option value="mm_refseq230">Mus musculus — RefSeq 230</option>
+        </select>
+      </div>
+    </div>
+
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <span class="section-label" style="margin:0;">Isoforms found on NCBI</span>
+        <div style="display:flex;gap:16px;">
+          <span class="select-all-lnk" onclick="selectAllIso(true)">Select all</span>
+          <span class="select-all-lnk" onclick="selectAllIso(false)">Deselect all</span>
+        </div>
+      </div>
+      <div class="isoform-list-box" id="isoList">
+        <!-- populated by JS -->
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:16px;">
+      <button id="btnRunPipeline" class="btn waves-effect waves-light" onclick="runPipeline()"
+              style="height:44px;line-height:44px;padding:0 28px;">
+        <i class="material-icons" style="vertical-align:middle;font-size:16px;margin-right:4px">play_arrow</i>
+        Run Pipeline
+      </button>
+      <span id="isoCount" style="font-size:12px;color:#9e9e9e;"></span>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     View 3 — Running
+════════════════════════════════════════════════════════════════════════════ -->
+<div id="view-running" hidden>
+  <div class="running-inner">
+
+    <div class="running-title" id="runningTitle">Running pipeline…</div>
+
+    <div class="spinner-wrap" id="runSpinnerWrap">
+      <div class="custom-spinner"></div>
+    </div>
+
+    <div class="progress-log" id="progressLog"></div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     View 4 — Results
+════════════════════════════════════════════════════════════════════════════ -->
+<div id="view-results" class="app-shell" hidden>
+
+  <aside class="sidebar">
+    <button class="back-btn" onclick="showView('welcome')" style="width:100%;justify-content:center;">
+      <i class="material-icons" style="font-size:15px">arrow_back</i> New gene
+    </button>
+
+    <span class="section-label">Isoform</span>
+    <div id="accFilterBtns"><!-- populated --></div>
+
+    <span class="section-label">Search sequence</span>
+    <input class="seq-search" type="text" id="seqSearch" placeholder="e.g. AAGGG…" oninput="renderTable()">
+
+    <span class="section-label">Save</span>
+    <a id="btnSave" class="waves-effect waves-light btn"
+       onclick="saveResults()"
+       style="background:#2e7d32!important;display:flex;align-items:center;justify-content:center;gap:4px;">
+      <i class="material-icons" style="font-size:14px">save</i> Save results
+    </a>
+    <div id="saveMsg" style="font-size:11px;color:#2e7d32;text-align:center;padding:3px 0;" hidden>Saved ✓</div>
+
+    <span class="section-label" style="margin-top:12px;">Export</span>
+    <a class="waves-effect waves-light btn" onclick="exportCsv()">Export CSV</a>
+  </aside>
+
+  <div class="main-area" id="resultsMain">
+    <div class="card placeholder-card z-depth-1">
+      <i class="material-icons grey-text">science</i>
+      <span class="grey-text">Loading results…</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     Saved panel (overlay)
+════════════════════════════════════════════════════════════════════════════ -->
+<div id="panel-saved">
+  <div class="saved-header">
+    <h3>
+      <i class="material-icons" style="vertical-align:middle;font-size:16px;margin-right:6px">folder_open</i>
+      Already Scraped
+    </h3>
+    <button class="saved-close" onclick="toggleSaved()">×</button>
+  </div>
+  <div class="saved-list" id="savedList">
+    <div class="saved-empty">
+      No saved results yet.<br>Run a pipeline and click <strong>Save results</strong>.
+    </div>
+  </div>
+</div>
+
+<!-- Filter panel -->
+<div id="panel-filter">
+  <div class="fpanel-header">
+    <span>Filter</span>
+    <button class="fpanel-close" onclick="toggleFilterPanel()">×</button>
+  </div>
+  <div class="fpanel-body">
+    <div>
+      <div class="fpanel-section">Score threshold</div>
+      <select class="fpanel-select browser-default" id="fMinScore" onchange="updateFilter()">
+        <option value="0">Any score</option>
+        <option value="3">&ge; 3 / 6</option>
+        <option value="4">&ge; 4 / 6</option>
+        <option value="5">&ge; 5 / 6</option>
+        <option value="6">6 / 6 only</option>
+      </select>
+    </div>
+    <div>
+      <div class="fpanel-section">Options</div>
+      <label class="fpanel-row">
+        <input type="checkbox" id="fNonoverlap" checked onchange="updateFilter()">
+        <div class="fcb"><i class="material-icons">check</i></div>
+        <span>Best per region</span>
+      </label>
+      <label class="fpanel-row">
+        <input type="checkbox" id="fValidated" onchange="updateFilter()">
+        <div class="fcb"><i class="material-icons">check</i></div>
+        <span>siDirect2 validated</span>
+      </label>
+      <label class="fpanel-row">
+        <input type="checkbox" id="fAllIso" onchange="updateFilter()">
+        <div class="fcb"><i class="material-icons">check</i></div>
+        <span>Shared by all isoforms</span>
+      </label>
+    </div>
+  </div>
+</div>
+
+<!-- Save-name modal -->
+<div id="modal-save-name" hidden>
+  <div class="save-modal-box">
+    <h3>Name this save</h3>
+    <div>
+      <input id="saveNameInput" type="text" placeholder="e.g. initial_screen" maxlength="40"
+             oninput="updateSavePreview()" onkeydown="if(event.key==='Enter')confirmSave();if(event.key==='Escape')closeSaveModal();">
+      <div class="save-modal-preview" style="margin-top:6px">
+        Saved as: <strong id="saveNamePreview"></strong>
+      </div>
+    </div>
+    <div class="save-modal-actions">
+      <button class="btn-flat waves-effect" onclick="closeSaveModal()" style="color:#757575;">Cancel</button>
+      <button class="btn waves-effect waves-light" onclick="confirmSave()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Status bar -->
+<div id="status-bar">Ready</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+<script>
+// ── Seeded data from Flask ────────────────────────────────────────────────────
+const KNOWN_GENES = {{ known_genes | tojson }};
+
+// ── App state ─────────────────────────────────────────────────────────────────
+let savedGenesList  = [];
+let currentGene     = '';
+let currentSpecies  = 'hs_refseq230';
+let currentAccessions = [];
+let currentJobId    = null;
+let pollTimer       = null;
+let lastLogLen      = 0;
+let allRecords      = [];
+let filterPanelOpen = false;
+let currentAccFilter = 'all';
+let sortCol         = 'score';
+let sortAsc         = false;
+let page            = 0;
+let isFromSaved     = false;
+let saveData        = null;
+let resultsSaved    = true;
+const PAGE_SIZE     = 100;
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+function setStatus(msg, type = '') {
+  const el = document.getElementById('status-bar');
+  el.textContent = msg;
+  el.className = type;
+}
+
+function showView(name) {
+  ['welcome', 'isoforms', 'running', 'results'].forEach(v => {
+    const el = document.getElementById('view-' + v);
+    if (el) el.hidden = (v !== name);
+  });
+}
+
+// ── Autocomplete ──────────────────────────────────────────────────────────────
+let acItems = [...KNOWN_GENES];
+let acKbdIdx = -1;
+
+const geneInput = document.getElementById('geneInput');
+const acDrop    = document.getElementById('acDrop');
+
+function rebuildAcItems() {
+  const all = [...KNOWN_GENES];
+  for (const s of savedGenesList) {
+    if (!all.includes(s.gene)) all.push(s.gene);
+  }
+  acItems = all;
+}
+
+function renderDropdown(q) {
+  if (!q) { acDrop.hidden = true; return; }
+  const matches = acItems.filter(g => g.includes(q)).slice(0, 14);
+  if (!matches.length) { acDrop.hidden = true; return; }
+  const isSaved = g => savedGenesList.some(s => s.gene === g);
+  acDrop.innerHTML = matches.map((g, i) => {
+    const tag = KNOWN_GENES.includes(g) ? 'novel target' : (isSaved(g) ? 'saved' : '');
+    return `<div class="ac-item" data-gene="${g}" onmousedown="pickGene('${g}')">
+      <span>${g}</span>
+      ${tag ? `<span class="ac-tag">${tag}</span>` : ''}
+    </div>`;
+  }).join('');
+  acKbdIdx = -1;
+  acDrop.hidden = false;
+}
+
+geneInput.addEventListener('input', () => {
+  renderDropdown(geneInput.value.trim().toUpperCase());
+});
+
+geneInput.addEventListener('keydown', e => {
+  const items = acDrop.querySelectorAll('.ac-item');
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    acKbdIdx = Math.min(acKbdIdx + 1, items.length - 1);
+    items.forEach((el, i) => el.classList.toggle('kbd-active', i === acKbdIdx));
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    acKbdIdx = Math.max(acKbdIdx - 1, 0);
+    items.forEach((el, i) => el.classList.toggle('kbd-active', i === acKbdIdx));
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (acKbdIdx >= 0 && items[acKbdIdx]) pickGene(items[acKbdIdx].dataset.gene);
+    else startSearch();
+  } else if (e.key === 'Escape') {
+    acDrop.hidden = true;
+  }
+});
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.gene-search-wrap')) acDrop.hidden = true;
+});
+
+function pickGene(gene) {
+  geneInput.value = gene;
+  acDrop.hidden = true;
+  startSearch();
+}
+
+// ── Gene search (NCBI isoform lookup) ────────────────────────────────────────
+async function startSearch() {
+  const gene = geneInput.value.trim().toUpperCase();
+  if (!gene) { setStatus('Enter a gene name.', 'error'); return; }
+
+  const btn = document.getElementById('btnDesign');
+  btn.disabled = true;
+  acDrop.hidden = true;
+  setStatus(`Searching NCBI for ${gene} isoforms…`, 'running');
+
+  try {
+    const res  = await fetch('/api/designer/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gene }),
+    });
+    const data = await res.json();
+    if (data.error) { setStatus(data.error, 'error'); return; }
+
+    currentGene = data.gene;
+    // Check if already saved
+    if (savedGenesList.some(s => s.gene === data.gene)) {
+      if (!confirm(`${data.gene} has already been scraped and saved.\nScrape again and overwrite?`)) {
+        return;
+      }
+    }
+    renderIsoformPicker(data.gene, data.isoforms);
+    showView('isoforms');
+    setStatus(`Found ${data.isoforms.length} isoform(s) for ${data.gene}`, 'ok');
+  } catch (e) {
+    setStatus('Error: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function renderIsoformPicker(gene, isoforms) {
+  document.getElementById('isoHeading').textContent = `Select isoforms — ${gene}`;
+
+  const list = document.getElementById('isoList');
+  if (!isoforms.length) {
+    list.innerHTML = `<div style="padding:24px;text-align:center;color:#9e9e9e;font-size:13px;">
+      No RefSeq mRNA isoforms found for <strong>${gene}</strong> in Homo sapiens on NCBI.
+      <br>Check the gene name and try again.
+    </div>`;
+    updateIsoCount();
+    return;
+  }
+
+  list.innerHTML = isoforms.map((iso, i) => `
+    <label class="isoform-row">
+      <input type="checkbox" value="${iso.accession}" checked onchange="updateIsoCount()">
+      <div style="flex:1;min-width:0;">
+        <div class="isoform-acc">${iso.accession}</div>
+        <div class="isoform-title">${iso.title || '—'}</div>
+        ${iso.length ? `<div class="isoform-len">${Number(iso.length).toLocaleString()} nt</div>` : ''}
+      </div>
+    </label>`).join('');
+
+  updateIsoCount();
+}
+
+function selectAllIso(val) {
+  document.querySelectorAll('#isoList input[type=checkbox]').forEach(cb => cb.checked = val);
+  updateIsoCount();
+}
+
+function updateIsoCount() {
+  const n = document.querySelectorAll('#isoList input[type=checkbox]:checked').length;
+  document.getElementById('isoCount').textContent = n ? `${n} isoform(s) selected` : 'None selected';
+}
+
+// ── Pipeline ─────────────────────────────────────────────────────────────────
+async function runPipeline() {
+  const selected = Array.from(
+    document.querySelectorAll('#isoList input[type=checkbox]:checked')
+  ).map(cb => cb.value);
+
+  if (!selected.length) {
+    setStatus('Select at least one isoform.', 'error');
+    return;
+  }
+
+  currentAccessions = selected;
+  currentSpecies    = document.getElementById('speciesSelect').value;
+  isFromSaved       = false;
+  lastLogLen        = 0;
+
+  showView('running');
+  document.getElementById('runningTitle').textContent = `Running pipeline for ${currentGene}…`;
+  document.getElementById('progressLog').innerHTML = '';
+  document.getElementById('runSpinnerWrap').hidden = false;
+  setStatus(`Starting pipeline for ${currentGene} (${selected.length} isoform(s))…`, 'running');
+
+  try {
+    const res  = await fetch('/api/designer/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        gene: currentGene,
+        accessions: selected,
+        species: currentSpecies,
+      }),
+    });
+    const data = await res.json();
+    if (data.error) { setStatus(data.error, 'error'); return; }
+    currentJobId = data.job_id;
+    startPolling();
+  } catch (e) {
+    setStatus('Error: ' + e.message, 'error');
+  }
+}
+
+// ── Job polling ───────────────────────────────────────────────────────────────
+function startPolling() {
+  clearInterval(pollTimer);
+  pollTimer = setInterval(pollJob, 1800);
+}
+
+async function pollJob() {
+  if (!currentJobId) return;
+  try {
+    const res  = await fetch('/api/designer/job/' + currentJobId);
+    const data = await res.json();
+
+    // Append new log entries
+    const newEntries = (data.log || []).slice(lastLogLen);
+    for (const entry of newEntries) addLogEntry(entry.step, entry.msg);
+    lastLogLen = (data.log || []).length;
+
+    if (data.status === 'done') {
+      clearInterval(pollTimer);
+      document.getElementById('runSpinnerWrap').hidden = true;
+      allRecords = data.result || [];
+      resultsSaved = false;
+      saveData   = {
+        gene: currentGene, species: currentSpecies,
+        accessions: currentAccessions, records: allRecords,
+      };
+      setStatus(`Pipeline complete — ${allRecords.length} candidates for ${currentGene}`, 'ok');
+      renderResults();
+      showView('results');
+
+    } else if (data.status === 'error') {
+      clearInterval(pollTimer);
+      document.getElementById('runSpinnerWrap').hidden = true;
+      setStatus('Pipeline error: ' + (data.error || '').slice(0, 120), 'error');
+    }
+  } catch (_) { /* transient network error, keep polling */ }
+}
+
+function iconForStep(step) {
+  if (step === 'done' || step.endsWith('_done')) return 'check_circle';
+  if (step.endsWith('_warn'))                     return 'warning';
+  if (step.includes('error'))                     return 'error_outline';
+  return 'radio_button_unchecked';
+}
+function classForStep(step) {
+  if (step === 'done' || step.endsWith('_done')) return 'log-done';
+  if (step.endsWith('_warn'))                     return 'log-warn';
+  if (step.includes('error'))                     return 'log-error';
+  return 'log-info';
+}
+
+function addLogEntry(step, msg) {
+  const log = document.getElementById('progressLog');
+  const existing = log.querySelector(`[data-step="${CSS.escape(step)}"]`);
+  const cls  = classForStep(step);
+  const icon = iconForStep(step);
+
+  if (existing) {
+    existing.className = `log-entry ${cls}`;
+    existing.querySelector('i').textContent = icon;
+    existing.querySelector('span').textContent = msg;
+  } else {
+    const div = document.createElement('div');
+    div.className = `log-entry ${cls}`;
+    div.dataset.step = step;
+    div.innerHTML = `<i class="material-icons log-icon">${icon}</i><span>${msg}</span>`;
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
+  }
+}
+
+// ── Results rendering ─────────────────────────────────────────────────────────
+function scoreColor(s) {
+  if (s >= 6) return '#2e7d32';
+  if (s >= 5) return '#558b2f';
+  if (s >= 4) return '#f9a825';
+  if (s >= 3) return '#ef6c00';
+  return '#b71c1c';
+}
+function tick(v) { return v ? '<span class="tick">✓</span>' : '<span class="cross">·</span>'; }
+function dashIfNull(v, render) {
+  return (v === null || v === undefined || v === '') ? '<span style="color:#bdbdbd">—</span>' : render(v);
+}
+
+// ── Deduplication: merge records with identical sequence_dna ─────────────────
+function dedupeRecords(records) {
+  // Group by sequence_dna. For each group, pick the best representative
+  // (highest score, prefer validated), and annotate with _shared (array of accs).
+  const groups = new Map(); // seq → [records]
+  for (const r of records) {
+    const key = (r.sequence_dna || '').toUpperCase();
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(r);
+  }
+  const allAccessions = [...new Set(records.map(r => r.accession).filter(Boolean))];
+  const out = [];
+  for (const [, grp] of groups) {
+    // best = highest score, tie-break: validated first
+    const best = [...grp].sort((a, b) => {
+      const va = (b.sidirect2_validated ? 10 : 0) + (Number(b.score) || 0);
+      const vb = (a.sidirect2_validated ? 10 : 0) + (Number(a.score) || 0);
+      return va - vb;
+    })[0];
+    const sharedAccs = [...new Set(grp.map(r => r.accession).filter(Boolean))];
+    const isAll = allAccessions.length > 1 && sharedAccs.length === allAccessions.length;
+    out.push({
+      ...best,
+      _shared: sharedAccs,
+      _isAll:  isAll,
+      _grp:    grp,  // full per-isoform details for expand
+    });
+  }
+  return out;
+}
+
+let _expandedRows = new Set();
+
+const COLS = [
+  { key: '_expand',      label: '',
+    sort: false,
+    render: (r, idx) => r._grp && r._grp.length > 1
+      ? `<button class="expand-btn waves-effect ${_expandedRows.has(idx) ? 'open' : ''}" onclick="toggleExpand(${idx})" title="Show per-isoform details">
+           <i class="material-icons" style="font-size:16px;vertical-align:middle">chevron_right</i>
+         </button>`
+      : '' },
+  { key: 'sequence_dna', label: 'Sequence (DNA)',
+    render: r => {
+      const seq = r.sequence_dna || '';
+      const acc = r.accession || (r._shared && r._shared[0]) || '';
+      if (!seq) return '—';
+      return `<a href="https://www.ncbi.nlm.nih.gov/nuccore/${encodeURIComponent(acc)}" target="_blank"
+           title="NCBI: ${acc}" style="margin-right:4px;color:#9e9e9e;font-size:10px;text-decoration:none;vertical-align:middle;" onclick="event.stopPropagation()">NCBI↗</a><button onclick="event.stopPropagation();launchSiDirect2SeqDesigner('${acc}')" title="Submit to siDirect2"
+           style="margin-right:8px;border:none;background:none;padding:0;color:#9e9e9e;font-size:10px;cursor:pointer;font-family:inherit;vertical-align:middle;">siD2↗</button><span class="seq-cell">${seq}</span>`;
+    }},
+  { key: '_shared',      label: 'Isoforms',
+    sort: false,
+    render: r => {
+      if (!r._shared || r._shared.length === 0) return '<span style="color:#bdbdbd">—</span>';
+      const cls = r._isAll ? 'iso-chip-all' : 'iso-chip-some';
+      return `<div class="iso-chips">${r._shared.map(a => `<span class="iso-chip ${cls}">${a}</span>`).join('')}</div>`;
+    }},
+  { key: 'region',       label: 'Region',
+    render: r => r.region ? `<span class="region-badge">${r.region}</span>` : '—' },
+  { key: 'gc_pct',       label: 'GC%',
+    render: r => {
+      const v = parseFloat(r.gc_pct) || 0;
+      return `<div class="gc-wrap"><span>${v.toFixed(1)}</span><div class="gc-bar" style="width:${Math.round(v)}px"></div></div>`;
+    }},
+  { key: 'score',        label: 'Score',
+    render: r => dashIfNull(r.score, s => `<span class="score-pill" style="background:${scoreColor(Number(s))}">${Number(s)}/6</span>`) },
+  { key: 'sidirect2_validated', label: 'siD2 ✓',
+    render: r => r.sidirect2_validated ? '<span class="tick">✓</span>' : '<span class="cross">·</span>' },
+  { key: 'aa_start',     label: 'AA',    render: r => dashIfNull(r.aa_start,  v => tick(v)) },
+  { key: 'uu_end',       label: 'TT',    render: r => dashIfNull(r.uu_end,    v => tick(v)) },
+  { key: 'pos1_GC',      label: 'P1',    render: r => dashIfNull(r.pos1_GC,   v => tick(v)) },
+  { key: 'pos10_U',      label: 'P10',   render: r => dashIfNull(r.pos10_U,   v => tick(v)) },
+  { key: 'pos13_notG',   label: 'P13',   render: r => dashIfNull(r.pos13_notG,v => tick(v)) },
+  { key: 'pos19_AU',     label: 'P19',   render: r => dashIfNull(r.pos19_AU,  v => tick(v)) },
+  { key: 'sidirect2_guide_seed_tm', label: 'Guide Tm',
+    render: r => r.sidirect2_guide_seed_tm || '<span style="color:#bdbdbd">—</span>' },
+];
+
+function toggleExpand(idx) {
+  if (_expandedRows.has(idx)) _expandedRows.delete(idx);
+  else _expandedRows.add(idx);
+  // Toggle animation classes without full re-render
+  const btn = document.querySelector(`.expand-btn[onclick="toggleExpand(${idx})"]`);
+  if (btn) btn.classList.toggle('open', _expandedRows.has(idx));
+  const inner = document.getElementById(`detail-inner-${idx}`);
+  if (inner) inner.classList.toggle('open', _expandedRows.has(idx));
+}
+
+function renderResults() {
+  const accs = [...new Set(allRecords.map(r => r.accession).filter(Boolean))];
+
+  // Accession filter sidebar buttons
+  document.getElementById('accFilterBtns').innerHTML =
+    ['all', ...accs].map(a =>
+      `<button class="acc-btn ${a === currentAccFilter ? 'active' : ''}"
+               data-acc="${a}" onclick="setAccFilter('${a}', this)">
+        ${a === 'all' ? 'All isoforms' : a}
+       </button>`
+    ).join('');
+
+  // Stats
+  const total     = allRecords.length;
+  const validated = allRecords.filter(r => r.sidirect2_validated).length;
+  const score5    = allRecords.filter(r => r.score !== null && r.score !== undefined && Number(r.score) >= 5).length;
+  const score6    = allRecords.filter(r => r.score !== null && r.score !== undefined && Number(r.score) >= 6).length;
+
+  document.getElementById('resultsMain').innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+      <h2 style="font-size:18px;font-weight:600;color:#212121;margin:0">
+        ${isFromSaved ? '<i class="material-icons" style="vertical-align:middle;font-size:18px;margin-right:4px;color:#9e9e9e">folder_open</i>' : ''}${currentGene}
+      </h2>
+      <span style="font-size:11px;color:#9e9e9e">${currentSpecies}</span>
+    </div>
+    <div class="stats-row">
+      <div class="card z-depth-1"><div class="card-content"><div class="stat-label">Total</div><div class="stat-value" id="statTotal">${total.toLocaleString()}</div></div></div>
+      <div class="card z-depth-1"><div class="card-content"><div class="stat-label">Score 6/6</div><div class="stat-value">${score6}</div></div></div>
+      <div class="card z-depth-1"><div class="card-content"><div class="stat-label">Score ≥ 5/6</div><div class="stat-value">${score5}</div></div></div>
+      <div class="card z-depth-1"><div class="card-content"><div class="stat-label">siDirect2 ✓</div><div class="stat-value">${validated}</div></div></div>
+    </div>
+    <div class="filter-trigger-row">
+      <button id="filterTriggerBtn" class="filter-trigger-btn" onclick="toggleFilterPanel()">
+        <i class="material-icons" style="font-size:14px;vertical-align:middle">tune</i> Filter
+      </button>
+      <span id="filterSummaryText" class="filter-summary-text"></span>
+    </div>
+    <div class="card z-depth-1" style="margin:0">
+      <div style="overflow-x:auto">
+        <table class="results-table">
+          <thead id="tableHead"></thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+      <div class="pagination-row" id="paginationRow">
+        <span id="pageInfo"></span>
+        <button id="btnPrev" onclick="changePage(-1)">← Prev</button>
+        <button id="btnNext" onclick="changePage(1)">Next →</button>
+      </div>
+    </div>`;
+
+  document.getElementById('btnSave').hidden  = isFromSaved;
+  document.getElementById('saveMsg').hidden  = true;
+  updateFilterTrigger();
+  renderTable();
+}
+
+
+
+function setAccFilter(acc, btn) {
+  document.querySelectorAll('.acc-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  currentAccFilter = acc;
+  page = 0;
+  renderTable();
+}
+
+function parsePos(posStr) {
+  if (!posStr) return null;
+  const m = String(posStr).match(/(\d+)[-–](\d+)/);
+  return m ? [parseInt(m[1]), parseInt(m[2])] : null;
+}
+
+function getFilterState() {
+  return {
+    minScore:    parseInt(document.getElementById('fMinScore')?.value  || '0') || 0,
+    validated:   document.getElementById('fValidated')?.checked  || false,
+    nonoverlap:  document.getElementById('fNonoverlap')?.checked || false,
+    allIsoforms: document.getElementById('fAllIso')?.checked     || false,
+  };
+}
+
+function isFilterActive() {
+  const f = getFilterState();
+  return f.minScore > 0 || f.validated || f.nonoverlap || f.allIsoforms;
+}
+
+function getFilterSummary() {
+  const f = getFilterState();
+  const parts = [];
+  if (f.minScore > 0) parts.push(`Score ≥${f.minScore}`);
+  if (f.validated)    parts.push('siDirect2 ✓');
+  if (f.nonoverlap)   parts.push('Best per region');
+  if (f.allIsoforms)  parts.push('All isoforms');
+  return parts.length ? parts.join(' · ') : 'No filters';
+}
+
+function toggleFilterPanel() {
+  filterPanelOpen = !filterPanelOpen;
+  document.getElementById('panel-filter').classList.toggle('open', filterPanelOpen);
+}
+
+function updateFilter() {
+  page = 0;
+  updateFilterTrigger();
+  renderTable();
+}
+
+function updateFilterTrigger() {
+  const btn   = document.getElementById('filterTriggerBtn');
+  const sumEl = document.getElementById('filterSummaryText');
+  if (!btn) return;
+  btn.classList.toggle('has-active', isFilterActive());
+  if (sumEl) sumEl.textContent = getFilterSummary();
+}
+
+function applyFilter(records) {
+  const f = getFilterState();
+  let r = records;
+  if (currentAccFilter !== 'all') r = r.filter(x => x.accession === currentAccFilter);
+  if (f.minScore > 0)  r = r.filter(x => Number(x.score) >= f.minScore);
+  if (f.validated)     r = r.filter(x => x.sidirect2_validated);
+  if (f.nonoverlap) {
+    const pool = [...r].sort((a, b) => {
+      const sa = (a.sidirect2_validated ? 10 : 0) + (Number(a.score) || 0);
+      const sb = (b.sidirect2_validated ? 10 : 0) + (Number(b.score) || 0);
+      return sb - sa;
+    });
+    const picked = [], used = [];
+    for (const x of pool) {
+      const pos = parsePos(x.position);
+      if (!pos) { picked.push(x); continue; }
+      if (!used.some(([s, e]) => pos[0] <= e && s <= pos[1])) {
+        picked.push(x); used.push(pos);
+      }
+    }
+    r = picked;
+  }
+  const q = (document.getElementById('seqSearch')?.value || '').toUpperCase().trim();
+  if (q) r = r.filter(x => (x.sequence_dna || '').toUpperCase().includes(q));
+  return r;
+}
+
+function renderTable() {
+  const headEl = document.getElementById('tableHead');
+  const bodyEl = document.getElementById('tableBody');
+  if (!headEl || !bodyEl) return;
+
+  // Deduplicate by sequence
+  let deduped = dedupeRecords(applyFilter(allRecords));
+  const fs = getFilterState();
+  if (fs.allIsoforms) deduped = deduped.filter(r => r._isAll);
+
+  deduped.sort((a, b) => {
+    if (sortCol === '_shared') {
+      // sort by number of shared isoforms descending
+      return sortAsc ? a._shared.length - b._shared.length
+                     : b._shared.length - a._shared.length;
+    }
+    let va = a[sortCol], vb = b[sortCol];
+    if (va === null || va === undefined) va = sortAsc ?  Infinity : -Infinity;
+    if (vb === null || vb === undefined) vb = sortAsc ?  Infinity : -Infinity;
+    if (typeof va === 'string') va = va.toLowerCase();
+    if (typeof vb === 'string') vb = vb.toLowerCase();
+    return sortAsc ? (va < vb ? -1 : va > vb ? 1 : 0)
+                   : (va > vb ? -1 : va < vb ? 1 : 0);
+  });
+
+  const total      = deduped.length;
+  const totalPages = Math.ceil(total / PAGE_SIZE) || 1;
+  page = Math.max(0, Math.min(page, totalPages - 1));
+  const slice = deduped.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const sliceOffset = page * PAGE_SIZE;
+
+  headEl.innerHTML = `<tr>${COLS.map(c => {
+    const sortable = c.sort !== false;
+    return `<th ${sortable ? `onclick="sortBy('${c.key}')"` : ''}
+               style="${sortable ? '' : 'cursor:default;'}" title="${c.key}">
+      ${c.label}${sortable && sortCol === c.key ? (sortAsc ? ' ↑' : ' ↓') : ''}
+    </th>`;
+  }).join('')}</tr>`;
+
+  bodyEl.innerHTML = slice.map((r, i) => {
+    const globalIdx = sliceOffset + i;
+    const isOpen = _expandedRows.has(globalIdx);
+    const mainRow = `<tr>${COLS.map(c => `<td>${c.render(r, globalIdx)}</td>`).join('')}</tr>`;
+
+    if (!r._grp || r._grp.length <= 1) return mainRow;
+
+    // Detail (expand) row
+    const detailCols = ['accession', 'position', 'region', 'score', 'sidirect2_validated', 'sidirect2_guide_seed_tm'];
+    const detailHead = detailCols.map(k => `<th>${k.replace(/_/g,' ')}</th>`).join('');
+    const detailBody = r._grp.map(sub => `<tr>${detailCols.map(k => {
+      if (k === 'score')               return `<td>${sub.score !== null && sub.score !== undefined ? `<span class="score-pill" style="background:${scoreColor(Number(sub.score))};font-size:10px">${Number(sub.score)}/6</span>` : '—'}</td>`;
+      if (k === 'sidirect2_validated') return `<td>${sub.sidirect2_validated ? '<span class="tick">✓</span>' : '<span class="cross">·</span>'}</td>`;
+      if (k === 'region')              return `<td>${sub.region ? `<span class="region-badge">${sub.region}</span>` : '—'}</td>`;
+      if (k === 'accession')           return `<td><span class="acc-badge">${sub.accession || '—'}</span></td>`;
+      return `<td>${sub[k] || '—'}</td>`;
+    }).join('')}</tr>`).join('');
+
+    const detailRow = `<tr class="detail-row">
+      <td colspan="${COLS.length}">
+        <div class="detail-inner ${isOpen ? 'open' : ''}" id="detail-inner-${globalIdx}">
+          <table class="detail-table">
+            <thead><tr>${detailHead}</tr></thead>
+            <tbody>${detailBody}</tbody>
+          </table>
+        </div>
+      </td>
+    </tr>`;
+
+    return mainRow + detailRow;
+  }).join('');
+
+  const statEl = document.getElementById('statTotal');
+  if (statEl) statEl.textContent = total.toLocaleString() + ` (${allRecords.length} raw)`;
+
+  document.getElementById('pageInfo').textContent =
+    `${page * PAGE_SIZE + 1}–${Math.min((page + 1) * PAGE_SIZE, total)} of ${total.toLocaleString()}`;
+  document.getElementById('btnPrev').disabled = page === 0;
+  document.getElementById('btnNext').disabled = page >= totalPages - 1;
+}
+
+function sortBy(col) {
+  if (sortCol === col) sortAsc = !sortAsc;
+  else { sortCol = col; sortAsc = false; }
+  renderTable();
+}
+
+function changePage(d) { page += d; renderTable(); }
+
+// ── Save ─────────────────────────────────────────────────────────────────────
+function saveResults() {
+  if (!saveData) return;
+  document.getElementById('saveNameInput').value = '';
+  updateSavePreview();
+  document.getElementById('modal-save-name').hidden = false;
+  setTimeout(() => document.getElementById('saveNameInput').focus(), 50);
+}
+
+function updateSavePreview() {
+  const label = document.getElementById('saveNameInput').value.trim();
+  const safe  = label.replace(/[^a-zA-Z0-9_\-]/g, '_').toUpperCase();
+  const gene  = currentGene || 'GENE';
+  document.getElementById('saveNamePreview').textContent = safe ? `${gene}_${safe}.json` : `${gene}.json`;
+}
+
+function closeSaveModal() {
+  document.getElementById('modal-save-name').hidden = true;
+}
+
+async function confirmSave() {
+  if (!saveData) return;
+  const label = document.getElementById('saveNameInput').value.trim();
+  const safe  = label.replace(/[^a-zA-Z0-9_\-]/g, '_');
+  closeSaveModal();
+  try {
+    const res  = await fetch('/api/designer/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...saveData, save_label: safe }),
+    });
+    const data = await res.json();
+    if (data.error) { setStatus('Save error: ' + data.error, 'error'); return; }
+    resultsSaved = true;
+    document.getElementById('btnSave').hidden = true;
+    document.getElementById('saveMsg').hidden = false;
+    setStatus(`Saved as ${data.name}.json`, 'ok');
+    await refreshSavedState();
+  } catch (e) {
+    setStatus('Save error: ' + e.message, 'error');
+  }
+}
+
+// ── siDirect2 launcher ────────────────────────────────────────────────────────
+async function launchSiDirect2SeqDesigner(acc) {
+  if (!acc) { setStatus('No accession available for siDirect2', 'error'); return; }
+  setStatus(`Fetching ${acc} FASTA from NCBI…`, 'running');
+  try {
+    const res = await fetch(`/api/designer/fasta/${encodeURIComponent(acc)}`);
+    if (!res.ok) throw new Error(await res.text());
+    const fasta = await res.text();
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = 'http://sidirect2.rnai.jp/design.cgi';
+    form.target = '_blank';
+    [['yourSeq', fasta], ['uitei','1'], ['seedTm','1'],
+     ['hidenonspe','1'], ['hitcount','1'], ['seedTmMax','25'],
+     ['spe', currentSpecies || 'hs_refseq230']
+    ].forEach(([n, v]) => {
+      const el = document.createElement('input');
+      el.type = 'hidden'; el.name = n; el.value = v;
+      form.appendChild(el);
+    });
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+    setStatus(`${acc} submitted to siDirect2 (new tab)`, 'ok');
+  } catch(e) {
+    setStatus('siDirect2 error: ' + e.message, 'error');
+  }
+}
+
+// ── Export CSV ────────────────────────────────────────────────────────────────
+function exportCsv() {
+  const filtered = applyFilter(allRecords);
+  if (!filtered.length) return;
+  const keys = Object.keys(filtered[0]);
+  const rows = [
+    keys.join(','),
+    ...filtered.map(r => keys.map(k => JSON.stringify(r[k] ?? '')).join(',')),
+  ];
+  const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${currentGene || 'sirna'}_candidates.csv`;
+  a.click();
+}
+
+// ── Saved panel ───────────────────────────────────────────────────────────────
+function toggleSaved() {
+  const panel = document.getElementById('panel-saved');
+  const isOpen = panel.classList.contains('open');
+  if (isOpen) {
+    panel.classList.remove('open');
+  } else {
+    loadSavedList();
+    panel.classList.add('open');
+  }
+}
+
+async function refreshSavedState() {
+  try {
+    const res = await fetch('/api/designer/saved');
+    savedGenesList = await res.json();
+    rebuildAcItems();
+    loadSavedList();
+  } catch (_) {}
+}
+
+async function loadSavedList() {
+  try {
+    const res   = await fetch('/api/designer/saved');
+    const items = await res.json();
+    savedGenesList = items;
+    rebuildAcItems();
+
+    const el = document.getElementById('savedList');
+    if (!items.length) {
+      el.innerHTML = `<div class="saved-empty">No saved results yet.<br>Run a pipeline and click <strong>Save results</strong>.</div>`;
+      return;
+    }
+
+    el.innerHTML = items.map(item => `
+      <div class="saved-item">
+        <div class="saved-item-main" onclick="loadSaved('${item.name}')">
+          <div class="saved-item-gene">${item.gene || item.name}</div>
+          <div class="saved-item-name">${item.name}</div>
+          <div class="saved-item-meta">
+            <span>${(item.total || 0).toLocaleString()} candidates</span>
+            <span>${item.validated || 0} validated</span>
+            <span>${item.score6 || 0} perfect 6/6</span>
+            ${item.saved_at ? `<span>${item.saved_at.slice(0, 10)}</span>` : ''}
+          </div>
+          ${(item.accessions || []).length
+            ? `<div class="saved-item-accs">${item.accessions.join(' · ')}</div>`
+            : ''}
+        </div>
+        <button class="saved-del-btn" title="Delete" onclick="deleteSaved('${item.name}')">
+          <i class="material-icons" style="font-size:16px">delete_outline</i>
+        </button>
+      </div>`).join('');
+  } catch (_) {}
+}
+
+async function deleteSaved(name) {
+  if (!confirm(`Delete "${name}"?`)) return;
+  try {
+    const res = await fetch('/api/designer/delete/' + encodeURIComponent(name), { method: 'DELETE' });
+    const data = await res.json();
+    if (data.error) { setStatus('Delete error: ' + data.error, 'error'); return; }
+    await refreshSavedState();
+  } catch (e) {
+    setStatus('Delete error: ' + e.message, 'error');
+  }
+}
+
+async function loadSaved(name) {
+  setStatus(`Loading ${name}…`, 'running');
+  try {
+    const res  = await fetch('/api/designer/load/' + encodeURIComponent(name));
+    const data = await res.json();
+    if (data.error) { setStatus(data.error, 'error'); return; }
+
+    currentGene       = data.gene;
+    currentSpecies    = data.species || 'hs_refseq230';
+    currentAccessions = data.accessions || [];
+    allRecords        = data.records || [];
+    saveData          = data;
+    isFromSaved       = true;
+    resultsSaved      = true;
+    currentAccFilter  = 'all';
+    sortCol           = 'score';
+    sortAsc           = false;
+    page              = 0;
+
+    document.getElementById('panel-saved').classList.remove('open');
+    renderResults();
+    showView('results');
+    setStatus(`Loaded ${currentGene} — ${allRecords.length} candidates`, 'ok');
+  } catch (e) {
+    setStatus('Load error: ' + e.message, 'error');
+  }
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+window.addEventListener('beforeunload', e => {
+  if (!resultsSaved && allRecords.length) {
+    e.preventDefault();
+    e.returnValue = 'You have unsaved results. Leave without saving?';
+  }
+});
+
+(async () => {
+  await refreshSavedState();
+})();
+</script>
+</body>
+</html>

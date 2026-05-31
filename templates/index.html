@@ -3,12 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>decoder thing</title>
+<title>igem26_test</title>
 <link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400;500;600&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
 <style>
 * { border-radius: 0 !important; font-family: 'Red Hat Display', sans-serif !important; }
+.material-icons { font-family: 'Material Icons' !important; font-weight: normal; font-style: normal; }
 
 body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; background: #fafafa; }
 
@@ -99,7 +100,7 @@ table.results-table thead th:hover { color: #212121; }
 
 <nav class="black">
   <div class="nav-wrapper" style="padding: 0 16px">
-    <span class="brand-logo" style="font-size:15px;font-weight:600">decoder thing</span>
+    <span class="brand-logo" style="font-size:15px;font-weight:600">igem26_testing</span>
 </nav>
 
 <div class="app-shell">
@@ -107,7 +108,7 @@ table.results-table thead th:hover { color: #212121; }
     <div class="upload-zone" id="dropZone">
       <input type="file" id="fileInput" accept=".tif,.tiff">
       <i class="material-icons">cloud_upload</i>
-      <strong id="dropLabel">Click or drag a TIFF here</strong>
+      <strong id="dropLabel">tiff upload</strong>
     </div>
     <a class="waves-effect btn-flat grey lighten-2" id="btnGenerate">Generate test image ▾</a>
     <div class="gen-params" id="genParams">
@@ -125,7 +126,7 @@ table.results-table thead th:hover { color: #212121; }
   <div class="main-area" id="main">
     <div class="card placeholder-card">
       <i class="material-icons grey-text">scatter_plot</i>
-      <span class="grey-text">Load an image and press <strong>Run pipeline</strong></span>
+      <span class="grey-text">load tiff then<strong>Run pipeline</strong></span>
     </div>
   </div>
 </div>
@@ -253,7 +254,7 @@ function renderResults(data) {
     el.addEventListener("click", () => openLightbox(el.querySelector("img").src, el.querySelector(".channel-label").textContent))
   );
   renderTable();
-  setStatus(`Done — ${data.n_beads} beads, ${data.n_codes} unique codes, ${nUnk} unknown.`, "ok");
+  setStatus(`finished with ${data.n_beads} beads${data.n_codes} unique codes${nUnk} unknown. generate ok.`, "ok");
 }
 
 function channelStripHtml(data) {

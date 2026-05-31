@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>siRNA Candidate Viewer</title>
+<link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
+<style>
+* { border-radius: 0 !important; font-family: 'Red Hat Display', sans-serif !important; }
+.material-icons { font-family: 'Material Icons' !important; font-weight: normal; font-style: normal; }
+
+body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; background: #fafafa; }
+nav { flex-shrink: 0; }
+
+.app-shell { flex: 1; display: grid; grid-template-columns: 220px 1fr; overflow: hidden; }
+
+.sidebar {
+  background: #fff;
+  border-right: 1px solid #e0e0e0;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+}
+
+.sidebar .section-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: #9e9e9e; margin-bottom: 4px; margin-top: 8px; }
+.sidebar .section-label:first-child { margin-top: 0; }
+
+.gene-btn {
+  display: block; width: 100%; text-align: left;
+  padding: 7px 10px; font-size: 13px; font-weight: 500;
+  border: 1px solid #e0e0e0; background: #fff; color: #424242;
+  cursor: pointer; transition: background .1s, color .1s;
+}
+.gene-btn:hover { background: #f5f5f5; }
+.gene-btn.active { background: #212121; color: #fff; border-color: #212121; }
+.gene-btn .gene-meta { font-size: 10px; color: #9e9e9e; font-weight: 400; }
+.gene-btn.active .gene-meta { color: #bdbdbd; }
+
+.filter-group { display: flex; flex-direction: column; gap: 4px; }
+.filter-btn {
+  display: block; width: 100%; text-align: left;
+  padding: 5px 10px; font-size: 12px;
+  border: 1px solid #e0e0e0; background: #fff; color: #757575;
+  cursor: pointer; transition: background .1s;
+}
+.filter-btn:hover { background: #f5f5f5; color: #212121; }
+.filter-btn.active { background: #424242; color: #fff; border-color: #424242; }
+
+.seq-search { width: 100%; border: 1px solid #e0e0e0; padding: 5px 8px; font-size: 12px; outline: none; }
+.seq-search:focus { border-color: #212121; }
+
+.main-area { overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+
+.placeholder-card { height: 300px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: #bdbdbd; }
+.placeholder-card i { font-size: 52px !important; }
+
+.stats-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.stats-row .card { flex: 1; min-width: 100px; margin: 0; }
+.stats-row .card-content { padding: 12px 16px !important; }
+.stat-label { font-size: 10px; color: #9e9e9e; text-transform: uppercase; letter-spacing: .06em; }
+.stat-value { font-size: 26px; font-weight: 600; color: #212121; line-height: 1.1; }
+
+.section-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: #9e9e9e; margin-bottom: 8px; }
+
+table.results-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.results-table thead th {
+  cursor: pointer; user-select: none; white-space: nowrap;
+  font-weight: 600; color: #757575; padding: 8px 10px;
+  border-bottom: 2px solid #e0e0e0; text-align: left;
+}
+table.results-table thead th:hover { color: #212121; }
+table.results-table tbody tr { border-bottom: 1px solid #f0f0f0; transition: background .08s; }
+table.results-table tbody tr:hover { background: #f5f5f5; }
+table.results-table tbody td { padding: 7px 10px; vertical-align: middle; white-space: nowrap; }
+
+.seq-cell { font-family: ui-monospace, monospace !important; letter-spacing: .05em; font-size: 12px; color: #1a237e; }
+.score-pill { display: inline-block; padding: 1px 8px; font-size: 11px; font-weight: 700; color: #fff; }
+.badge-val  { display: inline-block; padding: 1px 8px; font-size: 11px; font-weight: 600; background: #e8f5e9; color: #2e7d32; }
+.iso-badge  { display: inline-block; padding: 1px 6px; font-size: 10px; font-weight: 700; margin: 1px; background: #e3f2fd; color: #1565c0; }
+.iso-badge.all { background: #e8f5e9; color: #2e7d32; }
+.badge-none { color: #bdbdbd; font-size: 11px; }
+.tick  { color: #2e7d32; font-weight: 700; }
+.cross { color: #bdbdbd; }
+.gc-wrap { display: inline-flex; align-items: center; gap: 6px; }
+.gc-bar  { height: 5px; background: #212121; opacity: 0.35; min-width: 2px; }
+.top-flag { display: inline-block; background: #fff9c4; border: 1px solid #f9a825; color: #e65100; font-size: 10px; font-weight: 700; padding: 0 5px; margin-left: 5px; }
+
+.pagination-row { display: flex; justify-content: flex-end; align-items: center; gap: 10px; padding: 8px 12px; border-top: 1px solid #e0e0e0; font-size: 12px; color: #9e9e9e; }
+.pagination-row button { border: 1px solid #e0e0e0; background: #fff; padding: 3px 10px; font-size: 12px; cursor: pointer; }
+.pagination-row button:hover:not(:disabled) { background: #f5f5f5; border-color: #424242; }
+.pagination-row button:disabled { opacity: .35; cursor: default; }
+
+#status-bar { flex-shrink: 0; padding: 5px 20px; font-size: 11px; color: #9e9e9e; background: #fff; border-top: 1px solid #e0e0e0; }
+#status-bar.error   { color: #c62828; }
+#status-bar.running { color: #616161; }
+#status-bar.ok      { color: #2e7d32; }
+</style>
+</head>
+<body>
+
+<nav class="black">
+  <div class="nav-wrapper" style="padding: 0 16px; display:flex; align-items:center; justify-content:space-between;">
+    <span class="brand-logo" style="font-size:15px;font-weight:600">
+      <i class="material-icons" style="vertical-align:middle;font-size:17px;margin-right:6px">iGEM</i>siRNA Candidates
+     </span>
+    <div style="display:flex;align-items:center;gap:16px;">
+      <a href="/designer" style="color:#9e9e9e;font-size:12px;text-decoration:none;">
+        <i class="material-icons" style="vertical-align:middle;font-size:15px">biotech</i> Designer
+      </a>
+      <a href="/isoforms" style="color:#9e9e9e;font-size:12px;text-decoration:none;">
+        <i class="material-icons" style="vertical-align:middle;font-size:15px">account_tree</i> Isoforms
+      </a>
+      <a href="/" style="color:#9e9e9e;font-size:12px;text-decoration:none;">
+        <i class="material-icons" style="vertical-align:middle;font-size:15px">arrow_back</i> Bead Imaging
+      </a>
+    </div>
+  </div>
+</nav>
+
+<div class="app-shell">
+
+  <aside class="sidebar">
+    <span class="section-label" style="margin-top:12px">Gene target</span>
+    <div id="geneBtns">
+      {% for g in genes %}
+      <button class="gene-btn" data-gene="{{ g }}" onclick="loadGene('{{ g }}', this)">
+        {{ g }}
+        <span class="gene-meta">{{ accessions[g] }}</span>
+      </button>
+      {% endfor %}
+    </div>
+
+    <span class="section-label" style="margin-top:12px">Filter</span>
+    <div class="filter-group">
+      <button class="filter-btn active" data-filter="all"       onclick="setFilter('all',this)">All candidates</button>
+      <button class="filter-btn"        data-filter="validated" onclick="setFilter('validated',this)">siDirect2 validated</button>
+      <button class="filter-btn"        data-filter="score6"    onclick="setFilter('score6',this)">Score 6/6 only</button>
+      <button class="filter-btn"        data-filter="score5"    onclick="setFilter('score5',this)">Score ≥ 5/6</button>
+      <button class="filter-btn"        data-filter="nonoverlap" onclick="setFilter('nonoverlap',this)">Best per region ★</button>
+      <button class="filter-btn"        data-filter="local"     onclick="setFilter('local',this)">Local screen only</button>
+    </div>
+
+    <span class="section-label" style="margin-top:12px">Search sequence</span>
+    <input class="seq-search" type="text" id="seqSearch" placeholder="e.g. AAGGG…" oninput="renderTable()">
+
+    <span class="section-label" style="margin-top:12px">Export</span>
+    <a class="waves-effect waves-light btn" style="width:100%;background:#212121!important" onclick="exportCsv()">Export CSV</a>
+
+    <span class="section-label" style="margin-top:12px">References</span>
+    <div style="display:flex;flex-direction:column;gap:3px;">
+      {% for g, acc in accessions.items() %}
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;padding:3px 2px;">
+        <span style="font-weight:600;color:#424242">{{ g }}</span>
+        <span style="display:flex;gap:6px;">
+          <a href="https://www.ncbi.nlm.nih.gov/nuccore/{{ acc }}" target="_blank" style="color:#1565c0;text-decoration:none;" title="NCBI: {{ acc }}">{{ acc }}</a>
+          <button onclick="launchSiDirect2('{{ g }}')" style="border:none;background:none;padding:0;color:#6a1b9a;font-size:11px;cursor:pointer;font-family:inherit;" title="Submit {{ g }} to siDirect2">siD2 ↗</button>
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+  </aside>
+
+  <div class="main-area" id="main">
+    <div class="card placeholder-card z-depth-1">
+      <i class="material-icons grey-text">science</i>
+      <span class="grey-text">Select a gene to load candidates</span>
+    </div>
+  </div>
+</div>
+
+<div id="status-bar">Ready</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+<script>
+let allRecords = [], filteredRecords = [];
+let currentFilter = 'all';
+let sortCol = 'score', sortAsc = false;
+let page = 0;
+const PAGE_SIZE = 100;
+
+// Isoform cross-reference groups
+const ISOFORM_GROUPS = {
+  'ASGR1':    { members: ['ASGR1', 'ASGR1-V2', 'ASGR1-ISOB'], labels: { 'ASGR1': 'V1', 'ASGR1-V2': 'V2', 'ASGR1-ISOB': 'isoB' } },
+  'ASGR1-V2': { members: ['ASGR1', 'ASGR1-V2', 'ASGR1-ISOB'], labels: { 'ASGR1': 'V1', 'ASGR1-V2': 'V2', 'ASGR1-ISOB': 'isoB' } },
+  'ASGR1-ISOB':{ members: ['ASGR1', 'ASGR1-V2', 'ASGR1-ISOB'], labels: { 'ASGR1': 'V1', 'ASGR1-V2': 'V2', 'ASGR1-ISOB': 'isoB' } },
+  'APOA5':    { members: ['APOA5', 'APOA5-V2', 'APOA5-V3'], labels: { 'APOA5': 'V1', 'APOA5-V2': 'V2', 'APOA5-V3': 'V3' } },
+  'APOA5-V2': { members: ['APOA5', 'APOA5-V2', 'APOA5-V3'], labels: { 'APOA5': 'V1', 'APOA5-V2': 'V2', 'APOA5-V3': 'V3' } },
+  'APOA5-V3': { members: ['APOA5', 'APOA5-V2', 'APOA5-V3'], labels: { 'APOA5': 'V1', 'APOA5-V2': 'V2', 'APOA5-V3': 'V3' } },
+};
+let isoformSets = {};
+let currentGene = '';
+
+function scoreColor(s) {
+  if (s >= 6) return '#2e7d32';
+  if (s >= 5) return '#558b2f';
+  if (s >= 4) return '#f9a825';
+  if (s >= 3) return '#ef6c00';
+  return '#b71c1c';
+}
+function tick(v) { return v ? '<span class="tick">✓</span>' : '<span class="cross">·</span>'; }
+function setStatus(msg, type='') { const el=document.getElementById('status-bar'); el.textContent=msg; el.className=type; }
+
+async function loadGene(gene, btn) {
+  document.querySelectorAll('.gene-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  currentGene = gene.toUpperCase();
+  setStatus(`Loading ${gene}…`, 'running');
+  document.getElementById('main').innerHTML = `<div class="card placeholder-card z-depth-1"><div class="preloader-wrapper small active"><div class="spinner-layer spinner-blue-only"><div class="circle-clipper left"><div class="circle"></div></div></div></div><p style="color:#9e9e9e;margin-top:12px">Loading ${gene}…</p></div>`;
+  try {
+    const res = await fetch('/api/sirna/' + gene);
+    const data = await res.json();
+    if (data.error) { setStatus(data.error, 'error'); document.getElementById('main').innerHTML=`<div class="card placeholder-card z-depth-1"><i class="material-icons" style="color:#ef9a9a">error_outline</i><span style="color:#c62828">${data.error}</span></div>`; return; }
+
+    // If this gene belongs to an isoform group, fetch all members and build sequence sets
+    const group = ISOFORM_GROUPS[currentGene];
+    if (group) {
+      const myLabel = group.labels[currentGene];
+      const others = group.members.filter(g => g !== currentGene);
+      const sets = { [myLabel]: new Set(data.records.map(r => (r.sequence_dna || '').toUpperCase())) };
+      await Promise.all(others.map(async g => {
+        try {
+          const r2 = await fetch('/api/sirna/' + g);
+          const d2 = await r2.json();
+          if (!d2.error) sets[group.labels[g]] = new Set(d2.records.map(r => (r.sequence_dna || '').toUpperCase()));
+        } catch(_) {}
+      }));
+      isoformSets = sets;
+      data.records.forEach(r => {
+        const seq = (r.sequence_dna || '').toUpperCase();
+        r._shared = Object.entries(isoformSets)
+          .filter(([lbl]) => lbl !== myLabel)
+          .filter(([, s]) => s.has(seq))
+          .map(([lbl]) => lbl);
+      });
+    } else {
+      isoformSets = {};
+      data.records.forEach(r => { r._shared = []; });
+    }
+
+    allRecords = data.records;
+    page = 0;
+    renderMain(data);
+    setStatus(`${gene} — ${data.total} candidates, ${data.validated} siDirect2 validated, ${data.score6} perfect 6/6`, 'ok');
+  } catch(e) { setStatus('Error: ' + e.message, 'error'); }
+}
+
+function renderMain(data) {
+  document.getElementById('main').innerHTML = `
+    <div class="stats-row">
+      <div class="card z-depth-1"><div class="card-content"><div class="stat-label">Total candidates</div><div class="stat-value" id="statTotal">${data.total.toLocaleString()}</div></div></div>
+      <div class="card z-depth-1"><div class="card-content"><div class="stat-label">Score 6/6 (perfect)</div><div class="stat-value">${data.score6}</div></div></div>
+      <div class="card z-depth-1"><div class="card-content"><div class="stat-label">Score ≥ 5/6</div><div class="stat-value">${data.score5}</div></div></div>
+      <div class="card z-depth-1"><div class="card-content"><div class="stat-label">siDirect2 validated</div><div class="stat-value">${data.validated}</div></div></div>
+    </div>
+    <div class="card z-depth-1" style="margin:0">
+      <div class="card-content" style="padding:12px 16px 0">
+        <p class="section-label">Candidates</p>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="results-table">
+          <thead id="tableHead"></thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+      <div class="pagination-row" id="paginationRow">
+        <span id="pageInfo"></span>
+        <button id="btnPrev" onclick="changePage(-1)">← Prev</button>
+        <button id="btnNext" onclick="changePage(1)">Next →</button>
+      </div>
+    </div>`;
+  renderTable();
+}
+
+function setFilter(f, btn) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  currentFilter = f;
+  page = 0;
+  renderTable();
+}
+
+function parsePos(posStr) {
+  if (!posStr) return null;
+  const m = String(posStr).match(/(\d+)-(\d+)/);
+  return m ? [parseInt(m[1]), parseInt(m[2])] : null;
+}
+
+function applyFilter(records) {
+  const q = document.getElementById('seqSearch').value.toUpperCase().trim();
+  let r = records;
+  if (currentFilter === 'validated')   r = r.filter(x => x.sidirect2_validated);
+  else if (currentFilter === 'score6') r = r.filter(x => x.score >= 6);
+  else if (currentFilter === 'score5') r = r.filter(x => x.score >= 5);
+  else if (currentFilter === 'local')  r = r.filter(x => x.score !== null && x.score !== undefined);
+  else if (currentFilter === 'nonoverlap') {
+    // Greedy non-overlapping: sort by score desc (validated first), pick best, skip overlaps
+    const pool = [...r].sort((a, b) => {
+      const va = (b.sidirect2_validated ? 1 : 0) * 10 + (b.score ?? 0);
+      const vb = (a.sidirect2_validated ? 1 : 0) * 10 + (a.score ?? 0);
+      return va - vb;
+    });
+    const picked = [];
+    const used = []; // array of [start, end] ranges already taken
+    for (const cand of pool) {
+      const pos = parsePos(cand.position);
+      if (!pos) continue;
+      const overlaps = used.some(([s, e]) => pos[0] <= e && pos[1] >= s);
+      if (!overlaps) {
+        picked.push(cand);
+        used.push(pos);
+      }
+    }
+    r = picked;
+  }
+  if (q) r = r.filter(x => ((x.sequence_rna || x.sequence_dna || '')).toUpperCase().replace(/U/g,'T').includes(q.replace(/U/g,'T')));
+  return r;
+}
+
+function sortRecords(records) {
+  return [...records].sort((a, b) => {
+    let va = a[sortCol], vb = b[sortCol];
+    if (va == null) va = sortAsc ? Infinity : -Infinity;
+    if (vb == null) vb = sortAsc ? Infinity : -Infinity;
+    if (typeof va === 'boolean') va = va ? 1 : 0;
+    if (typeof vb === 'boolean') vb = vb ? 1 : 0;
+    if (va < vb) return sortAsc ? -1 : 1;
+    if (va > vb) return sortAsc ? 1 : -1;
+    return 0;
+  });
+}
+
+function doSort(col) {
+  if (sortCol === col) sortAsc = !sortAsc; else { sortCol = col; sortAsc = false; }
+  renderTable();
+}
+
+const COLS = [
+  { key: 'position',            label: 'Position' },
+  { key: 'sequence_rna',        label: 'Sequence (RNA)' },
+  { key: 'gc_pct',              label: 'GC%' },
+  { key: 'score',               label: 'Score' },
+  { key: 'sidirect2_validated', label: 'siDirect2' },
+  { key: '_shared',             label: 'Shared' },
+  { key: 'aa_start',            label: 'AA' },
+  { key: 'uu_end',              label: 'UU' },
+  { key: 'pos1_GC',             label: 'P1=G/C' },
+  { key: 'pos10_U',             label: 'P10=U' },
+  { key: 'pos13_notG',          label: 'P13≠G' },
+  { key: 'pos19_AU',            label: 'P19=A/U' },
+];
+
+function renderTable() {
+  const thead = document.getElementById('tableHead');
+  const tbody = document.getElementById('tableBody');
+  if (!thead || !tbody) return;
+
+  filteredRecords = sortRecords(applyFilter(allRecords));
+  const total = filteredRecords.length;
+  const start = page * PAGE_SIZE;
+  const slice = filteredRecords.slice(start, start + PAGE_SIZE);
+
+  // header
+  const si = k => sortCol === k ? (sortAsc ? ' ↑' : ' ↓') : '';
+  thead.innerHTML = '<tr>' + COLS.map(c =>
+    `<th onclick="doSort('${c.key}')">${c.label}${si(c.key)}</th>`
+  ).join('') + '</tr>';
+
+  // top positions (score 6 + validated)
+  const topPos = new Set(allRecords.filter(x => x.score >= 6 && x.sidirect2_validated).map(x => x.position));
+
+  tbody.innerHTML = slice.map(r => {
+    const seq = (r.sequence_rna || r.sequence_dna || '').toLowerCase().replace(/u/g, 't');
+    const gc = r.gc_pct != null ? parseFloat(r.gc_pct) : null;
+    const gcCell = gc != null && !isNaN(gc)
+      ? `<div class="gc-wrap"><div class="gc-bar" style="width:${Math.round(gc * 0.8)}px"></div>${gc.toFixed(1)}%</div>`
+      : '—';
+    const sc = r.score;
+    const scorePill = sc != null
+      ? `<span class="score-pill" style="background:${scoreColor(sc)}">${sc}/6</span>`
+      : '<span class="cross">—</span>';
+    const valCell = r.sidirect2_validated
+      ? '<span class="badge-val">✓ validated</span>'
+      : '<span class="badge-none">—</span>';
+    const topFlag = topPos.has(r.position) ? '<span class="top-flag">TOP</span>' : '';
+    const group = ISOFORM_GROUPS[currentGene];
+    const myLabel = group ? group.labels[currentGene] : null;
+    const allLabels = Object.keys(isoformSets).filter(l => l !== myLabel);
+    let sharedCell = '—';
+    if (group && allLabels.length) {
+      const shared = r._shared || [];
+      if (shared.length === allLabels.length) {
+        sharedCell = `<span class="iso-badge all">all 3</span>`;
+      } else if (shared.length > 0) {
+        sharedCell = shared.map(l => `<span class="iso-badge">${l}</span>`).join(' ');
+      } else {
+        sharedCell = '<span style="color:#bdbdbd;font-size:11px">unique</span>';
+      }
+    }
+    return `<tr>
+      <td>${r.position || '—'}${topFlag}</td>
+      <td class="seq-cell">${seq}</td>
+      <td>${gcCell}</td>
+      <td>${scorePill}</td>
+      <td>${valCell}</td>
+      <td>${sharedCell}</td>
+      <td>${tick(r.aa_start)}</td>
+      <td>${tick(r.uu_end)}</td>
+      <td>${tick(r.pos1_GC)}</td>
+      <td>${tick(r.pos10_U)}</td>
+      <td>${tick(r.pos13_notG)}</td>
+      <td>${tick(r.pos19_AU)}</td>
+    </tr>`;
+  }).join('');
+
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  document.getElementById('pageInfo').textContent = total === 0
+    ? 'No results'
+    : `${start + 1}–${Math.min(start + PAGE_SIZE, total)} of ${total.toLocaleString()}`;
+  document.getElementById('btnPrev').disabled = page === 0;
+  document.getElementById('btnNext').disabled = page >= totalPages - 1;
+
+  // update stat total to reflect filtered count
+  const statEl = document.getElementById('statTotal');
+  if (statEl && currentFilter !== 'all') statEl.textContent = total.toLocaleString() + ' shown';
+}
+
+function changePage(delta) {
+  page += delta;
+  renderTable();
+  document.getElementById('main').scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function exportCsv() {
+  if (!filteredRecords.length) return;
+  const keys = Object.keys(filteredRecords[0]);
+  const lines = [keys.join(','), ...filteredRecords.map(r => keys.map(k => JSON.stringify(r[k] ?? '')).join(','))];
+  Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/csv' })),
+    download: 'sirna_candidates.csv'
+  }).click();
+}
+
+// auto-load first gene
+window.addEventListener('DOMContentLoaded', () => {
+  const first = document.querySelector('.gene-btn');
+  if (first) loadGene(first.dataset.gene, first);
+});
+
+async function launchSiDirect2(gene) {
+  setStatus(`Fetching ${gene} FASTA from NCBI…`, 'running');
+  try {
+    const res = await fetch(`/api/sirna/${gene}/fasta`);
+    if (!res.ok) throw new Error(await res.text());
+    const fasta = await res.text();
+    // POST the FASTA to siDirect2 via a hidden auto-submit form
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = 'http://sidirect2.rnai.jp/design.cgi';
+    form.target = '_blank';
+    const field = document.createElement('input');
+    field.type = 'hidden';
+    field.name = 'yourSeq';
+    field.value = fasta;
+    // match the pipeline's settings
+    ['uitei', 'seedTm', 'hidenonspe', 'hitcount'].forEach(n => {
+      const el = document.createElement('input');
+      el.type = 'hidden'; el.name = n; el.value = '1';
+      form.appendChild(el);
+    });
+    const tmEl = document.createElement('input');
+    tmEl.type = 'hidden'; tmEl.name = 'seedTmMax'; tmEl.value = '25';
+    form.appendChild(tmEl);
+    const spEl = document.createElement('input');
+    spEl.type = 'hidden'; spEl.name = 'spe'; spEl.value = 'hs_refseq230';
+    form.appendChild(spEl);
+    form.appendChild(field);
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+    setStatus(`${gene} submitted to siDirect2 (new tab)`, 'ok');
+  } catch(e) {
+    setStatus('siDirect2 launch failed: ' + e.message, 'error');
+  }
+}
+</script>
+</body>
+</html>
