@@ -85,6 +85,7 @@ table.results-table thead th:hover { color: #212121; }
 #status-bar.error { color: #c62828; }
 #status-bar.running { color: #616161; }
 #status-bar.ok { color: #2e7d32; }
+#progress-bar { position: fixed; top: 0; left: 0; height: 3px; width: 0%; background: #212121; z-index: 9999; transition: width 0.4s ease; display: none; }
 
 #lightbox { display: none; position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,.88); justify-content: center; align-items: center; cursor: zoom-out; }
 #lightbox.open { display: flex; }
@@ -97,6 +98,7 @@ table.results-table thead th:hover { color: #212121; }
 </style>
 </head>
 <body>
+<div id="progress-bar"></div>
 
 <nav class="black">
   <div class="nav-wrapper" style="padding: 0 16px">
@@ -328,10 +330,31 @@ lbWrap.addEventListener("pointercancel", () => { dragging=false; lbWrap.classLis
 lbWrap.addEventListener("dblclick",      () => { lbScale=1; lbOx=0; lbOy=0; applyTransform(); });
 
 function setRunDisabled(d) { const b=document.getElementById("btnRun"); b.classList.toggle("disabled",d); b.style.pointerEvents=d?"none":""; b.style.opacity=d?".38":""; }
+let _progTimers = [];
+function _startProgress() {
+  const bar = document.getElementById('progress-bar');
+  _progTimers.forEach(clearTimeout); _progTimers = [];
+  bar.style.transition = 'none'; bar.style.width = '0%'; bar.style.display = 'block';
+  void bar.offsetWidth; // force reflow
+  bar.style.transition = 'width 0.4s ease';
+  _progTimers.push(setTimeout(() => bar.style.width = '25%', 50));
+  _progTimers.push(setTimeout(() => bar.style.width = '55%', 700));
+  _progTimers.push(setTimeout(() => bar.style.width = '72%', 2000));
+  _progTimers.push(setTimeout(() => bar.style.width = '83%', 4500));
+  _progTimers.push(setTimeout(() => bar.style.width = '91%', 9000));
+  _progTimers.push(setTimeout(() => bar.style.width = '95%', 18000));
+}
+function _stopProgress() {
+  _progTimers.forEach(clearTimeout); _progTimers = [];
+  const bar = document.getElementById('progress-bar');
+  bar.style.width = '100%';
+  setTimeout(() => { bar.style.display = 'none'; bar.style.width = '0%'; }, 500);
+}
 function setBusy(busy, msg="") {
   setRunDisabled(busy || !(fileInput.files[0]||sessionFile));
   const g=document.getElementById("btnGenerate"); g.classList.toggle("disabled",busy); g.style.pointerEvents=busy?"none":""; g.style.opacity=busy?".38":"";
   if (msg) setStatus(msg,"running");
+  if (busy) _startProgress(); else _stopProgress();
 }
 function setStatus(msg, type="") { const el=document.getElementById("status-bar"); el.textContent=msg; el.className=type; }
 </script>

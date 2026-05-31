@@ -460,32 +460,66 @@ _designer_jobs: dict = {}   # job_id → {status, log, result, error, gene}
 
 
 def _search_gene_isoforms(gene_name: str, organism: str = "Homo sapiens") -> list[dict]:
-    """Search NCBI nuccore for RefSeq NM_ mRNA isoforms of *gene_name*."""
-    term = f"{gene_name}[Gene Name] AND {organism}[Organism] AND mRNA[Filter]"
+    """Search NCBI for all RefSeq NM_/NR_ mRNA isoforms of *gene_name*.
+
+    Strategy: Gene DB esearch → Gene ID → elink gene_nuccore_refseqrna →
+    nuccore esummary.  This reliably returns every curated RefSeq transcript
+    associated with the gene, unlike a free-text nuccore search which can miss
+    isoforms or pick up unrelated records.
+    """
     try:
+        # 1. Resolve Gene ID
         r1 = requests.get(
             "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
-            params={"db": "nuccore", "term": term, "retmode": "json", "retmax": 30},
+            params={
+                "db": "gene",
+                "term": f"{gene_name}[Gene Name] AND {organism}[Organism]",
+                "retmode": "json",
+                "retmax": 5,
+            },
             headers=_SCRAPE_HEADERS,
             timeout=30,
         )
         r1.raise_for_status()
-        ids = r1.json().get("esearchresult", {}).get("idlist", [])
-        if not ids:
+        gene_ids = r1.json().get("esearchresult", {}).get("idlist", [])
+        if not gene_ids:
             return []
 
-        _time.sleep(0.4)
+        _time.sleep(0.34)
+
+        # 2. elink: gene → nuccore RefSeq RNA
         r2 = requests.get(
-            "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi",
-            params={"db": "nuccore", "id": ",".join(ids), "retmode": "json"},
+            "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/elink.fcgi",
+            params={
+                "dbfrom": "gene",
+                "db": "nuccore",
+                "id": gene_ids[0],
+                "linkname": "gene_nuccore_refseqrna",
+                "retmode": "json",
+            },
             headers=_SCRAPE_HEADERS,
             timeout=30,
         )
         r2.raise_for_status()
-        summaries = r2.json().get("result", {})
+        linksets = r2.json().get("linksets", [{}])[0].get("linksetdbs", [])
+        nuc_ids = linksets[0]["links"] if linksets else []
+        if not nuc_ids:
+            return []
+
+        _time.sleep(0.34)
+
+        # 3. esummary to get accession versions
+        r3 = requests.get(
+            "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi",
+            params={"db": "nuccore", "id": ",".join(nuc_ids), "retmode": "json"},
+            headers=_SCRAPE_HEADERS,
+            timeout=30,
+        )
+        r3.raise_for_status()
+        summaries = r3.json().get("result", {})
 
         isoforms = []
-        for uid in ids:
+        for uid in nuc_ids:
             s = summaries.get(uid, {})
             if not isinstance(s, dict):
                 continue
@@ -865,6 +899,119 @@ def designer_load(name: str):
     records = _enrich_seed_tm(data.get("records", []))
     data["records"] = _sanitize_records(records)
     return jsonify(data)
+
+
+# ── Sequence viewer helpers ───────────────────────────────────────────────────
+
+def _parse_gb_features(gb_text: str) -> dict:
+    """Parse exon and CDS feature coordinates from a GenBank flat-file string."""
+    exons: list[dict] = []
+    cds: dict | None = None
+    in_feat = False
+    cur_key = ""
+    cur_loc = ""
+    cur_quals: dict[str, str] = {}
+    auto_num = [0]
+
+    def _commit() -> None:
+        nonlocal cds
+        if not cur_key:
+            return
+        if cur_key == "exon":
+            m = re.search(r"<?(\d+)\.\.>?(\d+)", cur_loc)
+            if m:
+                auto_num[0] += 1
+                exons.append({
+                    "start":  int(m.group(1)),
+                    "end":    int(m.group(2)),
+                    "number": int(cur_quals.get("number", auto_num[0])),
+                })
+        elif cur_key == "CDS" and cds is None:
+            nums = re.findall(r"(\d+)\.\.(\d+)", cur_loc)
+            if nums:
+                cds = {"start": int(nums[0][0]), "end": int(nums[-1][1])}
+
+    for line in gb_text.splitlines():
+        if line.startswith("FEATURES"):
+            in_feat = True
+            continue
+        if not in_feat:
+            continue
+        if line.startswith(("ORIGIN", "//")):
+            _commit()
+            break
+        feat_m = re.match(r"^     (\w+)\s+(\S.*)$", line)
+        if feat_m and not line.startswith("                     "):
+            _commit()
+            cur_key = feat_m.group(1)
+            cur_loc = feat_m.group(2).strip()
+            cur_quals = {}
+        elif line.startswith("                     /"):
+            q_m = re.match(r'^                     /(\w+)(?:="?([^"]*)"?)?', line)
+            if q_m:
+                cur_quals[q_m.group(1)] = (q_m.group(2) or "").strip('"')
+        elif in_feat and cur_key and line.startswith("                     ") and not line.startswith("                     /"):
+            cur_loc += line.strip()
+
+    return {"exons": exons, "cds": cds}
+
+
+def _parse_gb_sequence(gb_text: str) -> str:
+    """Extract the raw uppercase nucleotide sequence from GenBank ORIGIN section."""
+    in_origin = False
+    parts: list[str] = []
+    for line in gb_text.splitlines():
+        if line.startswith("ORIGIN"):
+            in_origin = True
+            continue
+        if in_origin:
+            if line.startswith("//"):
+                break
+            parts.append(re.sub(r"[\s\d]", "", line).upper())
+    return "".join(parts)
+
+
+@app.route("/raw")
+def raw_viewer():
+    return render_template("raw.html", known_genes=list(NOVEL_TARGETS.keys()))
+
+
+@app.route("/api/raw/gene/<gene_name>")
+def raw_gene_api(gene_name: str):
+    isos_meta = _search_gene_isoforms(gene_name)
+    if not isos_meta:
+        return jsonify({"error": f"No isoforms found for '{gene_name}'"}), 404
+    results = []
+    for iso in isos_meta[:10]:
+        acc = iso["accession"]
+        if not acc.startswith("NM_"):
+            continue
+        try:
+            gb = fetch_genbank(acc)
+            seq = _parse_gb_sequence(gb)
+            feats = _parse_gb_features(gb)
+            results.append({
+                "accession": acc,
+                "title":     iso["title"],
+                "length":    len(seq),
+                "sequence":  seq,
+                "exons":     feats["exons"],
+                "cds":       feats["cds"],
+            })
+            _time.sleep(0.34)
+        except Exception as exc:
+            results.append({
+                "accession": acc,
+                "title":     iso["title"],
+                "length":    iso.get("length", 0),
+                "sequence":  "",
+                "exons":     [],
+                "cds":       None,
+                "error":     str(exc),
+            })
+    if not results:
+        return jsonify({"error": "No coding isoforms found"}), 404
+    return jsonify({"gene": gene_name, "isoforms": results})
 
 
 # praytothepythongodsandletitrun

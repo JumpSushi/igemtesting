@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sequence Viewer</title>
+<link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
+<style>
+* { border-radius: 0 !important; font-family: 'Red Hat Display', sans-serif !important; }
+.material-icons { font-family: 'Material Icons' !important; font-weight: normal; font-style: normal; }
+
+body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; background: #fafafa; }
+nav { flex-shrink: 0; }
+
+.app-shell { flex: 1; display: grid; grid-template-columns: 240px 1fr; overflow: hidden; }
+
+.sidebar {
+  background: #fff;
+  border-right: 1px solid #e0e0e0;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+}
+
+.section-label {
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .08em; color: #9e9e9e; margin-bottom: 4px;
+}
+
+#gene-input {
+  width: 100%; border: 1px solid #e0e0e0; background: #fff;
+  padding: 6px 8px; font-size: 13px; outline: none;
+}
+#gene-input:focus { border-color: #212121; }
+
+.btn { background-color: #212121 !important; }
+.btn:hover, .btn:focus { background-color: #424242 !important; }
+.sidebar .btn { width: 100%; display: block; margin: 0; }
+
+.flt-row {
+  display: flex; align-items: center; gap: 7px;
+  margin-bottom: 5px; cursor: pointer; font-size: 13px; color: #424242;
+}
+.flt-row input[type=checkbox] { accent-color: #212121; width: 14px; height: 14px; cursor: pointer; flex-shrink: 0; }
+.flt-sub { margin-left: 21px; margin-bottom: 4px; }
+.flt-sub label { font-size: 12px; color: #757575; display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.flt-sub input[type=range] { width: 100%; accent-color: #212121; }
+.range-wrap { display: grid; grid-template-columns: 1fr auto; gap: 4px; align-items: center; flex: 1; }
+.range-val  { font-family: ui-monospace, monospace !important; font-size: 11px; color: #9e9e9e; width: 28px; text-align: right; }
+.swatch { width: 11px; height: 11px; flex-shrink: 0; border: 1px solid #bdbdbd; }
+
+.iso-nav-item {
+  display: block; width: 100%; text-align: left;
+  padding: 5px 8px; font-size: 12px;
+  font-family: ui-monospace, monospace !important;
+  border: 1px solid #e0e0e0; background: #fff; color: #757575;
+  cursor: pointer; transition: background .1s; margin-bottom: 3px;
+}
+.iso-nav-item:hover { background: #f5f5f5; color: #212121; border-color: #bdbdbd; }
+
+.legend-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 12px; color: #424242; }
+.legend-swatch { width: 24px; height: 12px; flex-shrink: 0; border: 1px solid #bdbdbd; }
+
+.anno-list-item {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 4px;
+  font-size: 12px; padding: 4px 6px; border: 1px solid #e0e0e0; background: #fff;
+}
+.anno-del { cursor: pointer; color: #bdbdbd; font-size: 16px !important; margin-left: auto; }
+.anno-del:hover { color: #c62828; }
+
+.main-area { overflow-y: auto; padding: 16px; }
+
+.placeholder-card { height: 300px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: #bdbdbd; }
+.placeholder-card i { font-size: 52px !important; }
+
+.iso-card { background: #fff; border: 1px solid #e0e0e0; margin-bottom: 16px; }
+.iso-card-hdr {
+  padding: 9px 12px; border-bottom: 1px solid #e0e0e0;
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  background: #f5f5f5;
+}
+.iso-acc        { font-family: ui-monospace, monospace !important; font-size: 13px; font-weight: 600; color: #212121; }
+.iso-title      { font-size: 12px; color: #757575; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.iso-meta       { font-family: ui-monospace, monospace !important; font-size: 11px; color: #9e9e9e; white-space: nowrap; }
+.iso-cds-badge  { font-family: ui-monospace, monospace !important; font-size: 11px; color: #00838f; white-space: nowrap; }
+.iso-body       { padding: 12px; overflow-x: auto; }
+
+code.seq-wrap {
+  font-family: ui-monospace, monospace !important;
+  font-size: 13px; line-height: 1.8;
+  background: #fafafa; color: #212121;
+  padding: 10px 12px; display: block;
+  white-space: pre; border: 1px solid #eeeeee;
+}
+.seq-pos { color: #bdbdbd; user-select: none; display: inline-block; width: 6ch; text-align: right; margin-right: 1.5ch; }
+.in-cds  { color: #00838f !important; font-weight: 500; }
+
+.eb1  { background: rgba(255,138,101,.30); } .eb2  { background: rgba(255,202,40, .28); }
+.eb3  { background: rgba(102,217,132,.30); } .eb4  { background: rgba(79, 195,247,.30); }
+.eb5  { background: rgba(206,147,216,.30); } .eb6  { background: rgba(239, 83, 80,.30); }
+.eb7  { background: rgba(77, 208,225,.28); } .eb8  { background: rgba(255,167, 38,.30); }
+.eb9  { background: rgba(121,134,203,.30); } .eb10 { background: rgba(240, 98,146,.30); }
+.eb11 { background: rgba(212,225, 87,.28); } .eb12 { background: rgba(141,213,204,.28); }
+.eb13 { background: rgba(165,214,167,.30); } .eb14 { background: rgba(255,241,118,.28); }
+.eb15 { background: rgba(144,202,249,.30); } .eb16 { background: rgba(179,157,219,.30); }
+.eb17 { background: rgba(188,170,164,.28); } .eb18 { background: rgba(250,143,143,.30); }
+.eb19 { background: rgba(152,251,152,.28); } .eb20 { background: rgba(255,205,210,.28); }
+
+.flt-gc { background: rgba(56, 142, 60, .28) !important; }
+.flt-at { background: rgba(245,127, 23, .28) !important; }
+.flt-pa { background: rgba(230, 81,  0, .35) !important; }
+.flt-kz { background: rgba(123, 31,162, .28) !important; }
+
+.anno-u { text-decoration-line: underline; text-decoration-thickness: 3px; }
+
+#sel-badge {
+  position: fixed; bottom: 32px; right: 22px;
+  background: #212121; color: #fff;
+  padding: 6px 14px; font-size: 12px; font-weight: 600;
+  font-family: ui-monospace, monospace !important;
+  z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,.25);
+  display: none;
+}
+
+#anno-bar {
+  position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
+  background: #fff; border: 1px solid #e0e0e0;
+  padding: 8px 14px; display: none; align-items: center; gap: 10px;
+  z-index: 1001; box-shadow: 0 2px 12px rgba(0,0,0,.15); white-space: nowrap;
+}
+#anno-bar input[type=text] {
+  border: 1px solid #e0e0e0; padding: 4px 8px; font-size: 12px; width: 150px; outline: none; background: #fafafa;
+}
+#anno-bar input[type=text]:focus { border-color: #212121; }
+#anno-bar input[type=color] { width: 28px; height: 26px; border: 1px solid #e0e0e0; cursor: pointer; padding: 1px; }
+#anno-count-lbl { font-family: ui-monospace, monospace !important; font-size: 12px; color: #424242; }
+
+#status-bar { flex-shrink: 0; padding: 5px 20px; font-size: 11px; color: #9e9e9e; background: #fff; border-top: 1px solid #e0e0e0; }
+#status-bar.error   { color: #c62828; }
+#status-bar.running { color: #616161; }
+#status-bar.ok      { color: #2e7d32; }
+</style>
+</head>
+<body>
+
+<nav class="black">
+  <div class="nav-wrapper" style="padding: 0 16px">
+    <span class="brand-logo" style="font-size:15px;font-weight:600">sequence viewer</span>
+    <ul class="right">
+      <li><a href="/" style="font-size:13px;">designer</a></li>
+      <li><a href="/sirna" style="font-size:13px;">siRNA</a></li>
+    </ul>
+  </div>
+</nav>
+
+<div class="app-shell">
+
+  <aside class="sidebar">
+
+    <div>
+      <div class="section-label">Gene</div>
+      <datalist id="gene-list">
+        {% for gene in known_genes %}<option value="{{ gene }}">{% endfor %}
+      </datalist>
+      <input id="gene-input" type="text" placeholder="e.g. PCSK9" list="gene-list"
+             oninput="this.value=this.value.toUpperCase()"
+             onkeydown="if(event.key==='Enter') loadGene(this.value.trim())">
+      <a class="waves-effect waves-light btn" style="margin-top:6px;"
+         onclick="loadGene(document.getElementById('gene-input').value.trim())">
+        Load isoforms
+      </a>
+    </div>
+
+    <div>
+      <div class="section-label">Display</div>
+      <label class="flt-row">
+        <input type="checkbox" id="f-exon" checked onchange="onFilterChange()">
+        <span>Exon colours</span>
+      </label>
+      <label class="flt-row">
+        <input type="checkbox" id="f-cds" checked onchange="onFilterChange()">
+        <span style="color:#00838f;">CDS region</span>
+      </label>
+    </div>
+
+    <div>
+      <div class="section-label">Highlight</div>
+
+      <label class="flt-row">
+        <input type="checkbox" id="f-gc" onchange="onFilterChange(); toggleSub('gc-sub', this.checked)">
+        <span>GC-rich windows</span>
+        <span class="swatch" style="background:rgba(56,142,60,.4)"></span>
+      </label>
+      <div id="gc-sub" class="flt-sub" style="display:none;">
+        <label>threshold
+          <div class="range-wrap">
+            <input type="range" id="gc-thr" min="40" max="80" value="60"
+                   oninput="document.getElementById('gc-thr-v').textContent=this.value; onFilterChange()">
+            <span class="range-val" id="gc-thr-v">60</span>
+          </div>%
+        </label>
+        <label>window
+          <div class="range-wrap">
+            <input type="range" id="gc-win" min="10" max="60" value="30"
+                   oninput="document.getElementById('gc-win-v').textContent=this.value; onFilterChange()">
+            <span class="range-val" id="gc-win-v">30</span>
+          </div>nt
+        </label>
+      </div>
+
+      <label class="flt-row">
+        <input type="checkbox" id="f-at" onchange="onFilterChange(); toggleSub('at-sub', this.checked)">
+        <span>AT-rich windows</span>
+        <span class="swatch" style="background:rgba(245,127,23,.4)"></span>
+      </label>
+      <div id="at-sub" class="flt-sub" style="display:none;">
+        <label>threshold
+          <div class="range-wrap">
+            <input type="range" id="at-thr" min="40" max="80" value="60"
+                   oninput="document.getElementById('at-thr-v').textContent=this.value; onFilterChange()">
+            <span class="range-val" id="at-thr-v">60</span>
+          </div>%
+        </label>
+        <label>window
+          <div class="range-wrap">
+            <input type="range" id="at-win" min="10" max="60" value="30"
+                   oninput="document.getElementById('at-win-v').textContent=this.value; onFilterChange()">
+            <span class="range-val" id="at-win-v">30</span>
+          </div>nt
+        </label>
+      </div>
+
+      <label class="flt-row">
+        <input type="checkbox" id="f-pa" onchange="onFilterChange()">
+        <span>Poly-A <span style="font-family:ui-monospace,monospace;font-size:11px;color:#9e9e9e;">AATAAA</span></span>
+        <span class="swatch" style="background:rgba(230,81,0,.45)"></span>
+      </label>
+
+      <label class="flt-row">
+        <input type="checkbox" id="f-kz" onchange="onFilterChange()">
+        <span>Kozak <span style="font-family:ui-monospace,monospace;font-size:11px;color:#9e9e9e;">±10nt</span></span>
+        <span class="swatch" style="background:rgba(123,31,162,.4)"></span>
+      </label>
+    </div>
+
+    <div id="iso-nav-sec" style="display:none;">
+      <div class="section-label">Isoforms</div>
+      <div id="iso-nav-list"></div>
+    </div>
+
+    <div id="legend-sec" style="display:none;">
+      <div class="section-label">Exon legend</div>
+      <div id="legend-items"></div>
+    </div>
+
+    <div id="anno-list-sec" style="display:none;">
+      <div class="section-label">Annotations</div>
+      <div id="anno-list"></div>
+    </div>
+
+  </aside>
+
+  <div class="main-area" id="main">
+
+    <div id="empty-state" class="card placeholder-card">
+      <i class="material-icons grey-text">biotech</i>
+      <span class="grey-text">Select a gene to load RefSeq isoforms</span>
+    </div>
+
+    <div id="loading-state" style="display:none; padding:60px 0; text-align:center;">
+      <div class="preloader-wrapper active">
+        <div class="spinner-layer spinner-blue-only">
+          <div class="circle-clipper left"><div class="circle"></div></div>
+          <div class="gap-patch"><div class="circle"></div></div>
+          <div class="circle-clipper right"><div class="circle"></div></div>
+        </div>
+      </div>
+      <div id="loading-msg" style="margin-top:16px; color:#9e9e9e; font-size:12px;"></div>
+    </div>
+
+    <div id="seq-container"></div>
+
+  </div>
+
+</div>
+
+<div id="status-bar">Ready</div>
+
+<div id="sel-badge"></div>
+
+<div id="anno-bar">
+  <i class="material-icons" style="font-size:16px;color:#9e9e9e;">edit</i>
+  <span id="anno-count-lbl">0 nt</span>
+  <input type="text" id="anno-label" placeholder="label…" maxlength="60">
+  <input type="color" id="anno-color" value="#ff9800">
+  <a class="btn btn-small waves-effect waves-light" onclick="addAnnotation()">Add</a>
+  <a class="btn btn-small waves-effect grey darken-1" onclick="hideAnnoBar()">Cancel</a>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+<script>
+let isoformData = [];
+let isoMasks    = {};
+let userAnnos   = [];
+let pendingSel  = null;
+let selTimer    = null;
+
+const EXON_CSS = Array.from({length:20}, (_,i) => `eb${i+1}`);
+const EXON_RGBA = [
+  'rgba(255,138,101,.35)','rgba(255,202,40,.33)','rgba(102,217,132,.35)','rgba(79,195,247,.35)',
+  'rgba(206,147,216,.35)','rgba(239,83,80,.35)','rgba(77,208,225,.32)','rgba(255,167,38,.35)',
+  'rgba(121,134,203,.35)','rgba(240,98,146,.35)','rgba(212,225,87,.33)','rgba(141,213,204,.33)',
+  'rgba(165,214,167,.35)','rgba(255,241,118,.33)','rgba(144,202,249,.35)','rgba(179,157,219,.35)',
+  'rgba(188,170,164,.33)','rgba(250,143,143,.35)','rgba(152,251,152,.32)','rgba(255,205,210,.33)',
+];
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function setStatus(msg, cls) {
+  const b = document.getElementById('status-bar');
+  b.textContent = msg; b.className = cls || '';
+}
+
+async function loadGene(gene) {
+  if (!gene) return;
+  document.getElementById('empty-state').style.display   = 'none';
+  document.getElementById('loading-state').style.display = 'block';
+  document.getElementById('seq-container').innerHTML      = '';
+  document.getElementById('iso-nav-sec').style.display   = 'none';
+  document.getElementById('legend-sec').style.display    = 'none';
+  document.getElementById('loading-msg').textContent     = `Fetching ${gene} isoforms from NCBI…`;
+  setStatus(`Loading ${gene}…`, 'running');
+
+  try {
+    const r    = await fetch(`/api/raw/gene/${encodeURIComponent(gene)}`);
+    const data = await r.json();
+    if (!r.ok) { showErr(data.error || 'request failed'); return; }
+
+    isoformData = data.isoforms;
+    isoMasks    = {};
+    isoformData.forEach(iso => { if (iso.sequence) precompute(iso); });
+
+    document.getElementById('loading-state').style.display = 'none';
+    renderAll();
+    buildIsoNav();
+    buildLegend();
+    setStatus(`${isoformData.length} isoform(s) loaded for ${gene}`, 'ok');
+  } catch(e) { showErr(e.message); }
+}
+
+function showErr(msg) {
+  document.getElementById('loading-state').style.display = 'none';
+  document.getElementById('seq-container').innerHTML =
+    `<div class="card" style="padding:20px;color:#c62828;">${escHtml(msg)}</div>`;
+  setStatus(msg, 'error');
+}
+
+function precompute(iso) {
+  const seq    = iso.sequence.toUpperCase();
+  const n      = seq.length;
+  const exonAt = new Int16Array(n);
+  const inCds  = new Uint8Array(n);
+  for (const e of iso.exons) {
+    const hi = Math.min(e.end, n);
+    for (let i = e.start - 1; i < hi; i++) exonAt[i] = e.number;
+  }
+  if (iso.cds) {
+    const hi = Math.min(iso.cds.end, n);
+    for (let i = iso.cds.start - 1; i < hi; i++) inCds[i] = 1;
+  }
+  isoMasks[iso.accession] = { seq, exonAt, inCds };
+}
+
+function windowMask(seq, win, thr, isTarget) {
+  const n = seq.length, half = win >> 1;
+  const mask = new Uint8Array(n);
+  for (let c = 0; c < n; c++) {
+    const lo = Math.max(0, c - half), hi = Math.min(n, c + half + 1);
+    let cnt = 0;
+    for (let i = lo; i < hi; i++) if (isTarget(seq[i])) cnt++;
+    if (cnt / (hi - lo) * 100 >= thr) mask[c] = 1;
+  }
+  return mask;
+}
+
+function polyaMask(seq) {
+  const n = seq.length, mask = new Uint8Array(n);
+  const sigs = ['AATAAA','ATTAAA'];
+  for (let i = 0; i <= n - 6; i++)
+    if (sigs.includes(seq.slice(i, i+6))) for (let j=i;j<i+6;j++) mask[j]=1;
+  return mask;
+}
+
+function kozakMask(seq, cds) {
+  if (!cds) return new Uint8Array(seq.length);
+  const n = seq.length, mask = new Uint8Array(n);
+  const lo = Math.max(0, cds.start - 11), hi = Math.min(n, cds.start + 12);
+  for (let i = lo; i < hi; i++) mask[i] = 1;
+  return mask;
+}
+
+function fs(id)   { return document.getElementById(id); }
+function fchk(id) { return fs(id)?.checked ?? false; }
+function fnum(id) { return parseFloat(fs(id)?.value ?? 0); }
+
+function getFilters() {
+  return {
+    exonColors: fchk('f-exon'), cdsColor: fchk('f-cds'),
+    gc: fchk('f-gc'), gcThr: fnum('gc-thr'), gcWin: fnum('gc-win'),
+    at: fchk('f-at'), atThr: fnum('at-thr'), atWin: fnum('at-win'),
+    pa: fchk('f-pa'), kz: fchk('f-kz'),
+  };
+}
+
+let rerenderTimer = null;
+function onFilterChange() {
+  clearTimeout(rerenderTimer);
+  rerenderTimer = setTimeout(() => { if (isoformData.length) renderAll(); }, 80);
+}
+
+function toggleSub(id, show) {
+  document.getElementById(id).style.display = show ? 'block' : 'none';
+}
+
+function renderAll() {
+  const f         = getFilters();
+  const container = document.getElementById('seq-container');
+  const main      = document.getElementById('main');
+  const scrollY   = main.scrollTop;
+  container.innerHTML = isoformData.map(iso => renderCard(iso, f)).join('');
+  main.scrollTop = scrollY;
+  renderAnnoList();
+}
+
+function renderCard(iso, f) {
+  const acc   = escHtml(iso.accession);
+  const title = escHtml(iso.title || '');
+  const body  = iso.sequence
+    ? renderSeq(iso, f)
+    : `<div style="padding:8px;color:#9e9e9e;font-size:12px;">${escHtml(iso.error||'No sequence')}</div>`;
+
+  const cdsInfo  = iso.cds
+    ? `<span class="iso-cds-badge">CDS ${iso.cds.start}&ndash;${iso.cds.end}</span>` : '';
+  const exonInfo = iso.exons.length
+    ? `<span class="iso-meta">${iso.exons.length} exons</span>` : '';
+
+  return `<div class="iso-card" id="iso-${iso.accession}">
+    <div class="iso-card-hdr">
+      <span class="iso-acc">${acc}</span>
+      <span class="iso-title">${title}</span>
+      <span class="iso-meta">${(iso.length||0).toLocaleString()} nt</span>
+      ${cdsInfo}${exonInfo}
+    </div>
+    <div class="iso-body">${body}</div>
+  </div>`;
+}
+
+function renderSeq(iso, f) {
+  const m = isoMasks[iso.accession];
+  if (!m) return '';
+  const { seq, exonAt, inCds } = m;
+  const n = seq.length;
+
+  const gcM = f.gc ? windowMask(seq, f.gcWin, f.gcThr, c => c==='G'||c==='C') : null;
+  const atM = f.at ? windowMask(seq, f.atWin, f.atThr, c => c==='A'||c==='T') : null;
+  const paM = f.pa ? polyaMask(seq) : null;
+  const kzM = f.kz ? kozakMask(seq, iso.cds) : null;
+
+  const annoAt = new Array(n).fill(null);
+  for (const a of userAnnos) {
+    if (a.acc !== iso.accession) continue;
+    const hi = Math.min(a.end, n);
+    for (let i = a.start - 1; i < hi; i++) annoAt[i] = a;
+  }
+
+  const LINE = 60;
+  const buf  = [`<code class="seq-wrap" data-acc="${iso.accession}">`];
+
+  for (let ls = 0; ls < n; ls += LINE) {
+    const le = Math.min(ls + LINE, n);
+    buf.push(`<span class="seq-pos" data-ls="${ls+1}">${String(ls+1).padStart(6)}</span>`);
+
+    let i = ls;
+    while (i < le) {
+      const ex = f.exonColors ? exonAt[i] : 0;
+      const cd = f.cdsColor   ? inCds[i]  : 0;
+      const gc = gcM && gcM[i], at = atM && atM[i];
+      const pa = paM && paM[i], kz = kzM && kzM[i];
+      const an = annoAt[i];
+
+      let j = i + 1;
+      while (j < le) {
+        if (j % 10 === 0) break;  // break at every 10-nt boundary for spacing
+        const ex2 = f.exonColors ? exonAt[j] : 0;
+        const cd2 = f.cdsColor   ? inCds[j]  : 0;
+        if (ex2!==ex || cd2!==cd
+          || (gcM&&gcM[j])!==gc || (atM&&atM[j])!==at
+          || (paM&&paM[j])!==pa || (kzM&&kzM[j])!==kz
+          || annoAt[j]!==an) break;
+        j++;
+      }
+      const text = escHtml(seq.slice(i, j));
+
+      const cls = [];
+      let sty = '';
+      if (an) {
+        sty = `style="text-decoration-color:${an.color}" title="${escHtml(an.label)}"`;
+        cls.push('anno-u');
+      } else if (pa) cls.push('flt-pa');
+      else if  (kz) cls.push('flt-kz');
+      else if  (gc) cls.push('flt-gc');
+      else if  (at) cls.push('flt-at');
+      else if  (ex > 0) cls.push(EXON_CSS[(ex-1) % 20]);
+
+      if (cd) cls.push('in-cds');
+
+      if (cls.length || sty)
+        buf.push(`<span class="${cls.join(' ')}" ${sty}>${text}</span>`);
+      else
+        buf.push(text);
+
+      // space after every 10-nt group (but not at line end)
+      if (j % 10 === 0 && j < le) buf.push(' ');
+
+      i = j;
+    }
+    buf.push('\n');
+  }
+  buf.push('</code>');
+  return buf.join('');
+}
+
+function buildIsoNav() {
+  document.getElementById('iso-nav-list').innerHTML = isoformData.map(iso =>
+    `<button class="iso-nav-item" onclick="scrollToIso('${iso.accession}')"
+             title="${escHtml(iso.title||'')}">${escHtml(iso.accession)}</button>`
+  ).join('');
+  document.getElementById('iso-nav-sec').style.display = 'block';
+}
+
+function scrollToIso(acc) {
+  const el   = document.getElementById('iso-' + acc);
+  const main = document.getElementById('main');
+  if (el) main.scrollTo({ top: el.offsetTop - 16, behavior: 'smooth' });
+}
+
+function buildLegend() {
+  const seen = new Map();
+  for (const iso of isoformData)
+    for (const e of iso.exons)
+      seen.set(e.number, (seen.get(e.number) || 0) + 1);
+  if (!seen.size) return;
+
+  const nums = [...seen.keys()].sort((a,b) => a-b);
+  document.getElementById('legend-items').innerHTML = nums.map(n => {
+    const idx = (n - 1) % 20;
+    return `<div class="legend-row">
+      <span class="legend-swatch" style="background:${EXON_RGBA[idx]}"></span>
+      <span>Exon ${n}</span>
+      <span style="margin-left:auto;color:#9e9e9e;font-size:11px;">${seen.get(n)} iso</span>
+    </div>`;
+  }).join('');
+  document.getElementById('legend-sec').style.display = 'block';
+}
+
+function getSeqPos(textNode, charOff, seqWrapEl) {
+  let pos = 0;
+  const walk = document.createTreeWalker(seqWrapEl, NodeFilter.SHOW_TEXT, {
+    acceptNode: n => n.parentElement.classList.contains('seq-pos')
+      ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
+  });
+  while (walk.nextNode()) {
+    const n = walk.currentNode;
+    if (n === textNode) {
+      for (let i = 0; i < charOff; i++)
+        if (/[ACGTUacgtu]/.test(n.textContent[i])) pos++;
+      return pos;
+    }
+    pos += (n.textContent.match(/[ACGTUacgtu]/g) || []).length;
+  }
+  return pos;
+}
+
+function checkSelection() {
+  const sel   = window.getSelection();
+  const badge = document.getElementById('sel-badge');
+  if (!sel || sel.isCollapsed) { badge.style.display = 'none'; return; }
+
+  const text  = sel.toString();
+  const bases = (text.match(/[ACGTUacgtu]/g) || []).length;
+  if (!bases) { badge.style.display = 'none'; return; }
+
+  badge.textContent   = `${bases} nt`;
+  badge.style.display = 'block';
+
+  const anchor  = sel.anchorNode;
+  const seqWrap = (anchor?.nodeType === 3 ? anchor.parentElement : anchor)?.closest('.seq-wrap');
+  if (seqWrap && !sel.isCollapsed) {
+    document.getElementById('anno-count-lbl').textContent = `${bases} nt`;
+    pendingSel = { acc: seqWrap.dataset.acc, seqWrap, range: sel.getRangeAt(0).cloneRange() };
+    document.getElementById('anno-bar').style.display = 'flex';
+  }
+}
+
+function hideAnnoBar() {
+  document.getElementById('anno-bar').style.display = 'none';
+  pendingSel = null;
+  document.getElementById('anno-label').value = '';
+}
+
+function addAnnotation() {
+  if (!pendingSel) return;
+  const { acc, seqWrap, range } = pendingSel;
+
+  const startPos = getSeqPos(range.startContainer, range.startOffset, seqWrap);
+  const endPos   = getSeqPos(range.endContainer,   range.endOffset,   seqWrap);
+
+  const lo = Math.min(startPos, endPos) + 1;
+  const hi = Math.max(startPos, endPos);
+  if (hi < lo) return;
+
+  userAnnos.push({
+    id:    Date.now(),
+    acc,
+    start: lo,
+    end:   hi,
+    label: document.getElementById('anno-label').value.trim() || 'region',
+    color: document.getElementById('anno-color').value,
+  });
+
+  window.getSelection()?.removeAllRanges();
+  hideAnnoBar();
+  document.getElementById('sel-badge').style.display = 'none';
+  renderAll();
+}
+
+function removeAnnotation(id) {
+  userAnnos = userAnnos.filter(a => a.id !== id);
+  renderAll();
+}
+
+function renderAnnoList() {
+  const sec  = document.getElementById('anno-list-sec');
+  const list = document.getElementById('anno-list');
+  if (!userAnnos.length) { sec.style.display = 'none'; return; }
+  sec.style.display = 'block';
+  list.innerHTML = userAnnos.map(a =>
+    `<div class="anno-list-item">
+      <span class="swatch" style="background:${a.color}55;border:1px solid ${a.color};"></span>
+      <span style="font-family:ui-monospace,monospace;font-size:10px;color:#9e9e9e">${escHtml(a.acc)}</span>
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(a.label)}</span>
+      <span style="font-family:ui-monospace,monospace;font-size:10px;color:#9e9e9e">${a.start}&ndash;${a.end}</span>
+      <i class="material-icons anno-del" onclick="removeAnnotation(${a.id})">close</i>
+    </div>`
+  ).join('');
+}
+
+document.addEventListener('mouseup', () => {
+  clearTimeout(selTimer);
+  selTimer = setTimeout(checkSelection, 60);
+});
+document.addEventListener('keyup', () => {
+  clearTimeout(selTimer);
+  selTimer = setTimeout(checkSelection, 60);
+});
+document.addEventListener('mousedown', e => {
+  const bar = document.getElementById('anno-bar');
+  if (bar.style.display !== 'none' && !bar.contains(e.target))
+    setTimeout(hideAnnoBar, 150);
+});
+</script>
+</body>
+</html>

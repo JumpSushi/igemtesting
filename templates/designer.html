@@ -108,7 +108,7 @@ nav { flex-shrink: 0; }
 .isoform-row input[type=checkbox] {
   position: static !important; opacity: 1 !important; pointer-events: auto !important;
   width: 14px !important; height: 14px !important; flex-shrink: 0;
-  margin-top: 3px; cursor: pointer; accent-color: #212121;
+  margin-top: 3px; cursor: pointer; accent-color: #212121 !important;
 }
 .isoform-acc { font-size: 13px; font-weight: 600; color: #212121; font-family: 'Roboto Mono', monospace !important; }
 .isoform-title { font-size: 12px; color: #757575; margin-top: 2px; line-height: 1.4; }
@@ -205,16 +205,7 @@ nav { flex-shrink: 0; }
 }
 .fpanel-row:last-child { border-bottom: none; }
 .fpanel-row span { font-size: 13px; color: #212121; }
-.fpanel-row input[type=checkbox] { display: none; }
-.fcb {
-  width: 18px; height: 18px; flex-shrink: 0;
-  border: 2px solid #bdbdbd;
-  display: flex; align-items: center; justify-content: center;
-  transition: border-color .15s, background .15s;
-}
-.fpanel-row:has(input:checked) .fcb { border-color: #212121; background: #212121; }
-.fcb i { color: #fff; font-size: 12px !important; opacity: 0; transition: opacity .12s; }
-.fpanel-row:has(input:checked) .fcb i { opacity: 1; }
+.fpanel-row input[type=checkbox] { position: static !important; opacity: 1 !important; pointer-events: auto !important; accent-color: #212121; width: 14px !important; height: 14px !important; cursor: pointer; flex-shrink: 0; }
 .fpanel-select {
   width: 100%; border: 1px solid #e0e0e0; padding: 7px 10px;
   font-size: 13px; background: #fff; color: #212121; cursor: pointer;
@@ -544,17 +535,14 @@ table.results-table tbody td { padding: 7px 10px; vertical-align: middle; white-
       <div class="fpanel-section">Options</div>
       <label class="fpanel-row">
         <input type="checkbox" id="fNonoverlap" checked onchange="updateFilter()">
-        <div class="fcb"><i class="material-icons">check</i></div>
         <span>Best per region</span>
       </label>
       <label class="fpanel-row">
         <input type="checkbox" id="fValidated" onchange="updateFilter()">
-        <div class="fcb"><i class="material-icons">check</i></div>
         <span>siDirect2 validated</span>
       </label>
       <label class="fpanel-row">
         <input type="checkbox" id="fAllIso" onchange="updateFilter()">
-        <div class="fcb"><i class="material-icons">check</i></div>
         <span>Shared by all isoforms</span>
       </label>
     </div>
